@@ -3,6 +3,10 @@ import { emailTriageSkill } from "./email-triage";
 import { emailReplyDraftSkill } from "./email-reply-draft";
 import { taskExtractorSkill } from "./task-extractor";
 import { morningBriefSkill } from "./morning-brief";
+import { githubDailyDigestSkill } from "./github-daily-digest";
+import { jiraClosingCommentSkill } from "./jira-closing-comment";
+import { jiraUpdateSuggesterSkill } from "./jira-update-suggester";
+import { weeklyUpdateSkill } from "./weekly-update";
 import type { Skill } from "./types";
 
 /**
@@ -16,6 +20,10 @@ export const SKILLS: Record<string, Skill<any, any>> = {
   [emailReplyDraftSkill.id]: emailReplyDraftSkill,
   [taskExtractorSkill.id]: taskExtractorSkill,
   [morningBriefSkill.id]: morningBriefSkill,
+  [githubDailyDigestSkill.id]: githubDailyDigestSkill,
+  [jiraClosingCommentSkill.id]: jiraClosingCommentSkill,
+  [jiraUpdateSuggesterSkill.id]: jiraUpdateSuggesterSkill,
+  [weeklyUpdateSkill.id]: weeklyUpdateSkill,
 };
 
 export function getSkill(id: string) {
