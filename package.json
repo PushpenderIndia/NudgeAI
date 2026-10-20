@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "seed": "tsx src/db/seed.ts",
+    "setup": "drizzle-kit push && tsx src/db/seed.ts"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.3.1",
