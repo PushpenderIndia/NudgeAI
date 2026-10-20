@@ -7,6 +7,7 @@ import { githubDailyDigestSkill } from "./github-daily-digest";
 import { jiraClosingCommentSkill } from "./jira-closing-comment";
 import { jiraUpdateSuggesterSkill } from "./jira-update-suggester";
 import { weeklyUpdateSkill } from "./weekly-update";
+import { reminderEngineSkill } from "./reminder-engine";
 import type { Skill } from "./types";
 
 /**
@@ -24,6 +25,7 @@ export const SKILLS: Record<string, Skill<any, any>> = {
   [jiraClosingCommentSkill.id]: jiraClosingCommentSkill,
   [jiraUpdateSuggesterSkill.id]: jiraUpdateSuggesterSkill,
   [weeklyUpdateSkill.id]: weeklyUpdateSkill,
+  [reminderEngineSkill.id]: reminderEngineSkill,
 };
 
 export function getSkill(id: string) {

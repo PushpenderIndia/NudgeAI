@@ -5,15 +5,19 @@ import { usePathname } from "next/navigation";
 import { NAV_ITEMS } from "@/lib/nav";
 import { NudgeLogo } from "@/components/NudgeLogo";
 import { ConnectionDots } from "@/components/layout/ConnectionDots";
+import { Bell } from "@/components/notifications/Bell";
 import { cn } from "@/lib/utils";
 
 export function Sidebar() {
   const pathname = usePathname();
   return (
     <aside className="gradient-sidebar hidden h-dvh w-64 shrink-0 flex-col border-r border-border px-4 py-5 md:flex">
-      <Link href="/today" className="px-2">
-        <NudgeLogo variant="full" size={34} />
-      </Link>
+      <div className="flex items-center justify-between px-2">
+        <Link href="/today">
+          <NudgeLogo variant="full" size={34} />
+        </Link>
+        <Bell />
+      </div>
 
       <nav className="mt-7 flex flex-1 flex-col gap-1">
         {NAV_ITEMS.map((item) => {

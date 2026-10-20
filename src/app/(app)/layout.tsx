@@ -1,6 +1,7 @@
 import { Sidebar } from "@/components/layout/Sidebar";
 import { ChatPanel } from "@/components/layout/ChatPanel";
 import { MobileNav } from "@/components/layout/MobileNav";
+import { Toaster } from "@/components/notifications/Toaster";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -13,6 +14,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </main>
       </div>
       <ChatPanel />
+      <Toaster />
     </div>
   );
 }

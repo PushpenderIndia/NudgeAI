@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { NAV_ITEMS } from "@/lib/nav";
 import { NudgeLogo } from "@/components/NudgeLogo";
+import { Bell } from "@/components/notifications/Bell";
 import { cn } from "@/lib/utils";
 
 export function MobileNav() {
@@ -17,9 +18,12 @@ export function MobileNav() {
         <Link href="/today" onClick={() => setOpen(false)}>
           <NudgeLogo variant="full" size={28} />
         </Link>
-        <button onClick={() => setOpen((o) => !o)} aria-label="Menu" className="text-fg">
-          {open ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-        </button>
+        <div className="flex items-center gap-2">
+          <Bell />
+          <button onClick={() => setOpen((o) => !o)} aria-label="Menu" className="text-fg">
+            {open ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+          </button>
+        </div>
       </div>
       {open && (
         <nav className="grid grid-cols-2 gap-1 border-b border-border bg-surface px-3 py-3">
