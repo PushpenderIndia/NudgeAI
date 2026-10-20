@@ -5,6 +5,8 @@ import { emailConnector } from "./mock/email";
 import { jiraConnector } from "./mock/jira";
 import { githubConnector } from "./mock/github";
 import { teamsConnector } from "./mock/teams";
+import { githubLiveConnector } from "./live/github";
+import { jiraLiveConnector } from "./live/jira";
 
 export type { Connector, ConnectorAction, ActionResult, ConnectorItem } from "./types";
 
@@ -33,7 +35,13 @@ export async function getMode(): Promise<"demo" | "live"> {
 export async function getConnector(key: ConnectorKey): Promise<Connector> {
   const mode = await getMode();
   if (mode === "live") {
-    // PR-11 will wire real implementations here.
+    // GitHub + Jira have real live implementations; Email/Teams (MS Graph OAuth)
+    // are not wired yet and fall back to a clear message.
+    if (key === "github") return process.env.GITHUB_TOKEN ? githubLiveConnector : liveNotConfigured("github");
+    if (key === "jira") {
+      const ready = process.env.JIRA_BASE_URL && process.env.JIRA_EMAIL && process.env.JIRA_API_TOKEN;
+      return ready ? jiraLiveConnector : liveNotConfigured("jira");
+    }
     return liveNotConfigured(key);
   }
   return MOCKS[key];
