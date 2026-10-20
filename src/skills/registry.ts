@@ -2,6 +2,7 @@ import { meetingToMomSkill } from "./meeting-to-mom";
 import { emailTriageSkill } from "./email-triage";
 import { emailReplyDraftSkill } from "./email-reply-draft";
 import { taskExtractorSkill } from "./task-extractor";
+import { morningBriefSkill } from "./morning-brief";
 import type { Skill } from "./types";
 
 /**
@@ -14,6 +15,7 @@ export const SKILLS: Record<string, Skill<any, any>> = {
   [emailTriageSkill.id]: emailTriageSkill,
   [emailReplyDraftSkill.id]: emailReplyDraftSkill,
   [taskExtractorSkill.id]: taskExtractorSkill,
+  [morningBriefSkill.id]: morningBriefSkill,
 };
 
 export function getSkill(id: string) {
