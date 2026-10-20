@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { PanelRightClose, PanelRightOpen, Send, Sparkles } from "lucide-react";
+import { PanelRightClose, PanelRightOpen, Send, MessageCircle } from "lucide-react";
 import { OwlMark } from "@/components/NudgeLogo";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -49,7 +49,7 @@ export function ChatPanel() {
         {
           role: "assistant",
           content:
-            "I'm not fully wired to your tools yet in this view — try the Inbox, Meetings or Weekly Update pages to see me work.",
+            "I'm not fully wired to your tools yet in this view — try Today, Meetings or Weekly Update to see me work.",
         },
       ]);
     } finally {
@@ -61,7 +61,7 @@ export function ChatPanel() {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="fixed right-4 top-4 z-30 flex h-11 w-11 items-center justify-center rounded-full border border-border bg-surface glow-primary"
+        className="fixed right-4 top-4 z-30 flex h-11 w-11 items-center justify-center rounded-full border border-border bg-surface"
         aria-label="Open Nudge Assistant"
       >
         <PanelRightOpen className="h-5 w-5 text-primary-soft" />
@@ -73,7 +73,7 @@ export function ChatPanel() {
     <aside className="hidden h-dvh w-80 shrink-0 flex-col border-l border-border bg-surface/50 lg:flex">
       <header className="flex items-center justify-between border-b border-border px-4 py-3">
         <div className="flex items-center gap-2">
-          <OwlMark size={24} animated />
+          <OwlMark size={24} />
           <div>
             <p className="text-sm font-semibold">Nudge Assistant</p>
             <p className="text-[11px] text-muted">Ask about your day</p>
@@ -87,7 +87,7 @@ export function ChatPanel() {
       <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
         {messages.length === 0 && (
           <div className="space-y-3">
-            <p className="text-sm text-muted">Hi — I'm Nudge. I can summarise your day, draft replies and build your weekly update. I'll always ask before sending anything.</p>
+            <p className="text-sm text-muted">Hi — I&apos;m Nudge. I can summarise your day, draft replies and build your weekly update. I&apos;ll always ask before sending anything.</p>
             <div className="flex flex-col gap-2">
               {SUGGESTIONS.map((s) => (
                 <button
@@ -95,7 +95,7 @@ export function ChatPanel() {
                   onClick={() => send(s)}
                   className="flex items-center gap-2 rounded-xl border border-border bg-surface-2/50 px-3 py-2 text-left text-xs text-fg/90 hover:bg-surface-2"
                 >
-                  <Sparkles className="h-3.5 w-3.5 text-primary-soft" />
+                  <MessageCircle className="h-3.5 w-3.5 text-primary-soft" />
                   {s}
                 </button>
               ))}
@@ -107,7 +107,7 @@ export function ChatPanel() {
           <div
             key={i}
             className={cn(
-              "max-w-[90%] rounded-2xl px-3 py-2 text-sm",
+              "max-w-[90%] rounded-lg px-3 py-2 text-sm",
               m.role === "user"
                 ? "ml-auto bg-primary text-white"
                 : "bg-surface-2 text-fg"
@@ -119,8 +119,8 @@ export function ChatPanel() {
 
         {thinking && (
           <div className="flex items-center gap-2 text-sm text-muted">
-            <OwlMark size={18} animated />
-            <span>Nudge is thinking…</span>
+            <OwlMark size={18} />
+            <span>Give me a moment…</span>
           </div>
         )}
         <div ref={endRef} />

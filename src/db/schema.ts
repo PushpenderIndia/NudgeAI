@@ -205,6 +205,51 @@ export const reminders = sqliteTable("reminders", {
 });
 
 /* ------------------------------------------------------------------ */
+/* Agent orchestration                                                 */
+/* ------------------------------------------------------------------ */
+export type AgentRunStatus = "running" | "waiting_for_user" | "done" | "failed";
+export type AgentStepStatus = "running" | "done" | "failed";
+export type MeetingPrepStatus = "queued" | "working" | "ready";
+
+export const agentRuns = sqliteTable("agent_runs", {
+  id: id(),
+  trigger: text("trigger").notNull(),
+  title: text("title").notNull(),
+  status: text("status").$type<AgentRunStatus>().notNull().default("running"),
+  startedAt: createdAt(),
+  finishedAt: integer("finished_at", { mode: "timestamp_ms" }),
+});
+
+export const agentSteps = sqliteTable("agent_steps", {
+  id: id(),
+  runId: text("run_id").notNull(),
+  seq: integer("seq").notNull(),
+  agent: text("agent").notNull(),
+  action: text("action").notNull(),
+  tool: text("tool").notNull(),
+  model: text("model").notNull(),
+  inputSummary: text("input_summary").notNull(),
+  outputSummary: text("output_summary").notNull(),
+  status: text("status").$type<AgentStepStatus>().notNull().default("running"),
+  startedAt: createdAt(),
+  finishedAt: integer("finished_at", { mode: "timestamp_ms" }),
+  handoffTo: text("handoff_to"),
+});
+
+export const meetingPrep = sqliteTable("meeting_prep", {
+  meetingId: text("meeting_id").primaryKey(),
+  lastTimeSummary: text("last_time_summary").notNull().default(""),
+  decisions: text("decisions", { mode: "json" }).$type<string[]>().notNull().default([]),
+  openItems: text("open_items", { mode: "json" }).$type<{ owner: string; due: string; title: string }[]>().notNull().default([]),
+  relatedEmails: text("related_emails", { mode: "json" }).$type<string[]>().notNull().default([]),
+  relatedIssues: text("related_issues", { mode: "json" }).$type<string[]>().notNull().default([]),
+  relatedCommits: text("related_commits", { mode: "json" }).$type<string[]>().notNull().default([]),
+  talkingPoints: text("talking_points", { mode: "json" }).$type<string[]>().notNull().default([]),
+  status: text("status").$type<MeetingPrepStatus>().notNull().default("queued"),
+  generatedAt: integer("generated_at", { mode: "timestamp_ms" }),
+});
+
+/* ------------------------------------------------------------------ */
 /* Inferred types                                                      */
 /* ------------------------------------------------------------------ */
 export type Meeting = typeof meetings.$inferSelect;
@@ -219,3 +264,6 @@ export type Skill = typeof skills.$inferSelect;
 export type ActivityLogEntry = typeof activityLog.$inferSelect;
 export type Settings = typeof settings.$inferSelect;
 export type Reminder = typeof reminders.$inferSelect;
+export type AgentRun = typeof agentRuns.$inferSelect;
+export type AgentStep = typeof agentSteps.$inferSelect;
+export type MeetingPrep = typeof meetingPrep.$inferSelect;

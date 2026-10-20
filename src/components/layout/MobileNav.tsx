@@ -14,7 +14,7 @@ export function MobileNav() {
   const pathname = usePathname();
   return (
     <div className="md:hidden">
-      <div className="flex items-center justify-between border-b border-border bg-surface/70 px-4 py-3 backdrop-blur">
+      <div className="flex items-center justify-between border-b border-border bg-surface px-4 py-3">
         <Link href="/today" onClick={() => setOpen(false)}>
           <NudgeLogo variant="full" size={28} />
         </Link>
@@ -36,7 +36,7 @@ export function MobileNav() {
                 href={item.href}
                 onClick={() => setOpen(false)}
                 className={cn(
-                  "flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm",
+                  "flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm",
                   active ? "bg-surface-2 text-fg" : "text-muted"
                 )}
               >

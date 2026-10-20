@@ -159,28 +159,27 @@ export function ApprovalQueue() {
 
   if (loading) {
     return (
-      <div className="flex items-center gap-3 rounded-2xl border border-border bg-surface/50 px-5 py-8 text-sm text-muted">
-        <OwlMark size={24} animated />
-        Nudge is gathering what needs your OK…
+      <div className="flex items-center gap-3 border-y border-border bg-surface/40 px-5 py-8 text-sm text-muted">
+        <OwlMark size={24} />
+        I&apos;m gathering what needs your OK…
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="rounded-2xl border border-border bg-danger/5 px-5 py-6 text-sm text-danger">{error}</div>
+      <div className="border-y border-danger/30 bg-danger/5 px-5 py-6 text-sm text-danger">{error}</div>
     );
   }
 
   if (items.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-surface/50 px-6 py-16 text-center">
-        <OwlMark size={56} animated />
+      <div className="flex flex-col items-center justify-center border-y border-border px-6 py-16 text-center">
+        <OwlMark size={48} />
         <p className="mt-4 max-w-sm text-sm text-muted">
-          Nothing to approve — you&apos;re all caught up. When Nudge drafts a reply or a Jira
-          comment, it&apos;ll wait for your OK right here.
+          All caught up. I&apos;ll bring anything that needs your OK here.
         </p>
-        <p className="mt-3 text-xs text-nudge">Nudge never sends anything without you.</p>
+        <p className="mt-3 text-xs text-muted">Nothing is sent without your approval.</p>
         {notice && <p className="mt-4 text-xs text-success">{notice}</p>}
       </div>
     );

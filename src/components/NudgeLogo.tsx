@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 type Variant = "full" | "icon" | "animated";
@@ -13,12 +16,11 @@ interface NudgeLogoProps {
  * The Nudge owl — an original, minimal geometric owl.
  * - lavender→violet gradient body, big circular eyes with amber pupils,
  *   small feather-tuft ears.
- * - `animated` blinks slowly; `urgent` makes the amber eyes glow.
+ * - The pupils follow the pointer when the logo is used as a small welcome touch.
  */
 export function OwlMark({
   size = 40,
   urgent = false,
-  animated = false,
   className,
 }: {
   size?: number;
@@ -26,7 +28,9 @@ export function OwlMark({
   animated?: boolean;
   className?: string;
 }) {
+  const [pointer, setPointer] = useState({ x: 0, y: 0 });
   const uid = urgent ? "u" : "n";
+  const pupilTransform = `translate(${pointer.x} ${pointer.y})`;
   return (
     <svg
       width={size}
@@ -36,6 +40,13 @@ export function OwlMark({
       role="img"
       aria-label="Nudge owl"
       className={className}
+      onPointerMove={(event) => {
+        const rect = event.currentTarget.getBoundingClientRect();
+        setPointer({
+          x: Math.max(-1.5, Math.min(1.5, ((event.clientX - rect.left) / rect.width - 0.5) * 3)),
+          y: Math.max(-1.5, Math.min(1.5, ((event.clientY - rect.top) / rect.height - 0.5) * 3)),
+        });
+      }}
     >
       <defs>
         <linearGradient id={`owl-body-${uid}`} x1="12" y1="6" x2="52" y2="60" gradientUnits="userSpaceOnUse">
@@ -65,14 +76,7 @@ export function OwlMark({
       />
 
       {/* eyes */}
-      <g
-        style={
-          animated
-            ? { transformOrigin: "center 28px", transformBox: "fill-box" }
-            : undefined
-        }
-        className={animated ? "animate-[nudge-blink_6s_ease-in-out_infinite]" : undefined}
-      >
+      <g className="transition-transform duration-150">
         <circle cx="24" cy="28" r="9.5" fill="#EEF0FF" />
         <circle cx="40" cy="28" r="9.5" fill="#EEF0FF" />
         <circle
@@ -80,17 +84,17 @@ export function OwlMark({
           cy="28"
           r="4.6"
           fill="#FBBF24"
-          className={urgent ? "animate-[eye-glow_1.8s_ease-in-out_infinite]" : undefined}
+          transform={pupilTransform}
         />
         <circle
           cx="40"
           cy="28"
           r="4.6"
           fill="#FBBF24"
-          className={urgent ? "animate-[eye-glow_1.8s_ease-in-out_infinite]" : undefined}
+          transform={pupilTransform}
         />
-        <circle cx="25.6" cy="26.4" r="1.4" fill="#0A0F25" opacity="0.6" />
-        <circle cx="41.6" cy="26.4" r="1.4" fill="#0A0F25" opacity="0.6" />
+        <circle cx="25.6" cy="26.4" r="1.4" fill="#0A0F25" opacity="0.6" transform={pupilTransform} />
+        <circle cx="41.6" cy="26.4" r="1.4" fill="#0A0F25" opacity="0.6" transform={pupilTransform} />
       </g>
 
       {/* beak */}

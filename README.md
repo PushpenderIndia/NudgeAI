@@ -19,11 +19,15 @@ Nudge runs every AI task through **NVIDIA Nemotron** models on the
 
 ```bash
 npm install
+npm run setup
 npm run dev
 ```
 
-Open http://localhost:3000 — the Welcome page explains everything. Demo mode works with
-no credentials; AI features need a `NEBIUS_API_KEY` (added in a later step).
+`npm run setup` creates the local SQLite tables and loads the demo data. The `dev` script
+also checks and applies the Drizzle schema automatically before starting Next.js.
+
+Open http://localhost:3000 — the login page uses the demo credentials shown on screen.
+Demo mode works with no credentials; AI features need a `NEBIUS_API_KEY`.
 
 ## Tech
 

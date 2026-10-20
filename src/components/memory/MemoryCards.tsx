@@ -84,16 +84,16 @@ export function MemoryCards({ initial }: { initial: MemoryDTO[] }) {
     <section>
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold">What Nudge remembers</h2>
-          <p className="text-sm text-muted">People, projects, preferences and your writing style. Edit or delete anything.</p>
+          <h2 className="text-lg font-semibold">Your context</h2>
+          <p className="text-sm text-muted">People, projects, preferences, and writing style. You can change anything here.</p>
         </div>
         <Button size="sm" variant="secondary" onClick={() => setAdding((a) => !a)}>
-          <Plus className="h-4 w-4" /> Add memory
+          <Plus className="h-4 w-4" /> Add context
         </Button>
       </div>
 
       {adding && (
-        <div className="mb-5 animate-fade-up space-y-2 rounded-2xl border border-border bg-surface p-4">
+        <div className="mb-5 animate-fade-up space-y-2 rounded-lg border border-border bg-surface p-4">
           <select
             value={newType}
             onChange={(e) => setNewType(e.target.value as MemoryDTO["type"])}
@@ -117,7 +117,7 @@ export function MemoryCards({ initial }: { initial: MemoryDTO[] }) {
           const items = memories.filter((m) => m.type === group.type);
           const Icon = group.icon;
           return (
-            <div key={group.type} className="rounded-2xl border border-border bg-surface p-4">
+            <div key={group.type} className="rounded-lg border border-border bg-surface p-4">
               <div className="mb-3 flex items-center gap-2">
                 <Icon className="h-4 w-4 text-primary-soft" />
                 <h3 className="font-semibold">{group.label}</h3>

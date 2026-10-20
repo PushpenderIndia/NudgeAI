@@ -25,7 +25,7 @@ export default async function DevPage() {
     <div>
       <PageHeader
         title="Dev Activity"
-        subtitle="Your GitHub and Jira work in plain language. Nudge drafts closing comments and status updates — you approve before anything posts."
+        subtitle="A clear view of GitHub and Jira work, with drafts ready when you need them."
       />
       <div className="space-y-6">
         <GitDigest items={gitItems} />

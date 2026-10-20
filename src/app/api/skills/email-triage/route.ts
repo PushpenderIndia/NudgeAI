@@ -46,7 +46,7 @@ async function ensureUrgentTask(email: typeof emails.$inferSelect) {
 }
 
 export async function POST(req: Request) {
-  const { emailId, all } = await req.json().catch(() => ({}));
+  const { emailId } = await req.json().catch(() => ({}));
 
   try {
     const targets = emailId

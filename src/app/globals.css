@@ -1,23 +1,19 @@
 @import "tailwindcss";
 
-/*
-  Nudge design system — deep navy with blue-violet accents.
-  Dark mode by default; calm, focused, premium.
-  Amber (--nudge) is reserved for owl eyes, urgent items, and "Nudge says…" callouts.
-*/
+/* Nudge design system: quiet navy, clear hierarchy, and a little warmth. */
 
 :root {
   color-scheme: dark;
 
-  --bg: #0a0f25;
-  --surface: #121936;
-  --surface-2: #1a2250;
-  --border: #2a3370;
-  --primary: #6d5bf6;
-  --primary-soft: #a79bff;
-  --indigo: #4c5bd4;
-  --fg: #eef0ff;
-  --muted: #8e96c9;
+  --bg: #0f1630;
+  --surface: #151e3d;
+  --surface-2: #1d294e;
+  --border: #344064;
+  --primary: #7b6cf6;
+  --primary-soft: #b5adff;
+  --indigo: #5969cf;
+  --fg: #f0f2ff;
+  --muted: #a1a9c8;
   --nudge: #fbbf24;
   --success: #34d399;
   --danger: #f87171;
@@ -42,8 +38,8 @@
 
   --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
 
-  --radius-2xl: 1rem;
-  --radius-3xl: 1.5rem;
+  --radius-2xl: 0.875rem;
+  --radius-3xl: 1.125rem;
 }
 
 * {
@@ -56,10 +52,7 @@ html {
 
 body {
   min-height: 100%;
-  background:
-    radial-gradient(1200px 600px at 80% -10%, rgba(109, 91, 246, 0.12), transparent 60%),
-    radial-gradient(900px 500px at -10% 10%, rgba(76, 91, 212, 0.1), transparent 55%),
-    var(--bg);
+  background: var(--bg);
   color: var(--fg);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
@@ -80,38 +73,35 @@ body {
 }
 
 /* Reusable helpers */
-.glow-primary {
-  box-shadow: 0 0 0 1px rgba(109, 91, 246, 0.35), 0 8px 30px -8px rgba(109, 91, 246, 0.5);
-}
-.glow-nudge {
-  box-shadow: 0 0 18px -2px rgba(251, 191, 36, 0.45);
-}
 .gradient-sidebar {
-  background: linear-gradient(185deg, rgba(26, 34, 80, 0.9) 0%, rgba(10, 15, 37, 0.95) 55%, rgba(10, 15, 37, 1) 100%);
-}
-.gradient-hero {
-  background: linear-gradient(135deg, rgba(109, 91, 246, 0.18), rgba(76, 91, 212, 0.08) 45%, transparent 75%);
+  background: linear-gradient(180deg, #1a2549 0%, #111a35 100%);
 }
 .card-surface {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-2xl);
+  border-radius: 0.875rem;
 }
 
-@keyframes nudge-blink {
-  0%, 92%, 100% { transform: scaleY(1); }
-  95% { transform: scaleY(0.1); }
+.menu-row {
+  display: block;
+  width: 100%;
+  border-radius: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  font-size: 0.75rem;
+  color: var(--fg);
+  transition: background-color 150ms ease;
 }
-@keyframes eye-glow {
-  0%, 100% { filter: drop-shadow(0 0 1px rgba(251, 191, 36, 0.6)); }
-  50% { filter: drop-shadow(0 0 5px rgba(251, 191, 36, 0.95)); }
+.menu-row:hover {
+  background: var(--surface-2);
 }
+
 @keyframes fade-up {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
 .animate-fade-up {
-  animation: fade-up 0.35s ease both;
+  animation: fade-up 0.18s ease both;
 }
 
 @media (prefers-reduced-motion: reduce) {

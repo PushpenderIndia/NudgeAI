@@ -16,6 +16,9 @@ import {
   drafts,
   pendingActions,
   activityLog,
+  agentRuns,
+  agentSteps,
+  meetingPrep,
 } from "./schema";
 
 /** A date today at the given 24h time. */
@@ -24,10 +27,10 @@ function at(hour: number, minute = 0): Date {
   d.setHours(hour, minute, 0, 0);
   return d;
 }
-function daysAgo(n: number, hour = 10): Date {
+function daysAgo(n: number, hour = 10, minute = 0): Date {
   const d = new Date();
   d.setDate(d.getDate() - n);
-  d.setHours(hour, 0, 0, 0);
+  d.setHours(hour, minute, 0, 0);
   return d;
 }
 
@@ -36,6 +39,9 @@ async function seed() {
 
   // Clean slate (order doesn't matter — no FKs enforced)
   await db.delete(activityLog);
+  await db.delete(agentSteps);
+  await db.delete(agentRuns);
+  await db.delete(meetingPrep);
   await db.delete(pendingActions);
   await db.delete(drafts);
   await db.delete(reminders);
@@ -58,6 +64,22 @@ async function seed() {
 
   /* ---------------- Meetings (4; 3 with transcripts) ---------------- */
   await db.insert(meetings).values([
+    {
+      title: "Project Atlas — Client Sync (Northwind)",
+      startsAt: daysAgo(7, 11),
+      endsAt: daysAgo(7, 11, 45),
+      attendees: ["Pushpender Singh", "Priya Nair", "Dan Whitlock", "Northwind team"],
+      transcript: "Priya: Keep the export read-only through review. Pushpender: I’ll share the assessment summary before Friday. Dan: Marcus will unblock staging.",
+      hasMom: true,
+    },
+    {
+      title: "Project Atlas — Delivery Check-in",
+      startsAt: daysAgo(3, 11),
+      endsAt: daysAgo(3, 11, 30),
+      attendees: ["Pushpender Singh", "Priya Nair", "Dan Whitlock"],
+      transcript: "Pushpender: The findings export is ready for review. Priya: Let’s confirm the Northwind summary and keep the API read-only.",
+      hasMom: true,
+    },
     {
       title: "Daily Standup — Platform Squad",
       startsAt: at(9, 0),

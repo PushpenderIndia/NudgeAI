@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { GitCommit, GitPullRequest, Sparkles, AlertCircle } from "lucide-react";
+import { GitCommit, GitPullRequest, FileText, AlertCircle } from "lucide-react";
 import { OwlMark } from "@/components/NudgeLogo";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -48,7 +48,7 @@ export function GitDigest({ items }: { items: GitItemDTO[] }) {
           </p>
         </div>
         <Button size="sm" onClick={run} disabled={state === "loading"}>
-          {state === "loading" ? <><OwlMark size={16} animated /> Summarising…</> : <><Sparkles className="h-4 w-4" /> Summarise today&apos;s work</>}
+          {state === "loading" ? <><OwlMark size={16} /> Give me a moment…</> : <><FileText className="h-4 w-4" /> Write today&apos;s summary</>}
         </Button>
       </div>
 

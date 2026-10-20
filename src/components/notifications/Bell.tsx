@@ -34,7 +34,16 @@ export function Bell() {
   }
 
   useEffect(() => {
-    load();
+    let cancelled = false;
+    void fetch("/api/notifications")
+      .then((res) => res.json())
+      .then((data) => {
+        if (!cancelled) setNotifs(data.notifications ?? []);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -68,11 +77,11 @@ export function Bell() {
         aria-label="Notifications"
       >
         <BellIcon className="h-[18px] w-[18px]" />
-        {hasUnread && <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-nudge glow-nudge" />}
+        {hasUnread && <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-nudge" />}
       </button>
 
       {open && (
-        <div className="absolute right-0 top-11 z-40 w-72 rounded-2xl border border-border bg-surface p-3 shadow-xl animate-fade-up">
+        <div className="absolute right-0 top-11 z-40 w-72 rounded-lg border border-border bg-surface p-3 animate-fade-up">
           <div className="mb-2 flex items-center gap-2">
             <OwlMark size={18} />
             <p className="text-sm font-semibold">Nudge&rsquo;s nudges</p>

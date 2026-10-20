@@ -27,7 +27,7 @@ export function ToolConnectCard({
   const active = LEVELS.find((l) => l.key === perm)!;
 
   return (
-    <div className="rounded-2xl border border-border bg-surface p-4">
+    <div className="rounded-lg border border-border bg-surface p-4">
       <div className="flex items-center gap-3">
         <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-surface-2">
           <Icon className="h-5 w-5 text-primary-soft" />

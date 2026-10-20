@@ -21,7 +21,7 @@ export default async function TasksPage() {
     <div>
       <PageHeader
         title="Tasks"
-        subtitle="One to-do list pulled from your meetings, emails and Jira — plus anything you add. Drag to reorder."
+        subtitle="One clear list for everything you need to do. Drag to reorder."
       />
       <TaskList initial={initial} />
     </div>

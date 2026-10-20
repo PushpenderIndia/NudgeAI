@@ -1,15 +1,24 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { LogOut } from "lucide-react";
 import { NAV_ITEMS } from "@/lib/nav";
 import { NudgeLogo } from "@/components/NudgeLogo";
 import { ConnectionDots } from "@/components/layout/ConnectionDots";
 import { Bell } from "@/components/notifications/Bell";
 import { cn } from "@/lib/utils";
+import { signOutDemo } from "@/lib/auth";
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+
+  function handleSignOut() {
+    signOutDemo();
+    router.replace("/");
+  }
+
   return (
     <aside className="gradient-sidebar hidden h-dvh w-64 shrink-0 flex-col border-r border-border px-4 py-5 md:flex">
       <div className="flex items-center justify-between px-2">
@@ -28,9 +37,9 @@ export function Sidebar() {
               key={item.href}
               href={item.href}
               className={cn(
-                "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors",
+                "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors duration-150",
                 active
-                  ? "bg-surface-2 text-fg glow-primary"
+                  ? "bg-surface-2 text-fg"
                   : "text-muted hover:bg-surface-2/50 hover:text-fg"
               )}
             >
@@ -41,10 +50,18 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="mt-4 rounded-xl border border-border bg-surface/60 p-3">
+      <div className="mt-4 rounded-lg border border-border bg-surface/40 p-3">
         <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-wider text-muted">Connections</p>
         <ConnectionDots />
       </div>
+      <button
+        type="button"
+        onClick={handleSignOut}
+        className="mt-3 flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted transition-colors hover:bg-surface-2/60 hover:text-fg"
+      >
+        <LogOut className="h-4 w-4" />
+        Sign out
+      </button>
     </aside>
   );
 }

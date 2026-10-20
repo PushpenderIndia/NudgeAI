@@ -84,7 +84,7 @@ export function TaskList({ initial }: { initial: TaskDTO[] }) {
   return (
     <div>
       {/* Add */}
-      <div className="mb-5 flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-surface p-3">
+      <div className="mb-5 flex flex-wrap items-center gap-2 border-b border-border bg-surface/40 p-3">
         <Input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
@@ -124,11 +124,9 @@ export function TaskList({ initial }: { initial: TaskDTO[] }) {
 
       {/* To-do */}
       {visible.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-surface/50 px-6 py-14 text-center">
+        <div className="flex flex-col items-center justify-center border-y border-border px-6 py-14 text-center">
           <ListChecks className="h-8 w-8 text-muted" />
-          <p className="mt-3 max-w-xs text-sm text-muted">
-            Nothing here. Tasks from your meetings, emails and Jira land automatically — or add one above.
-          </p>
+          <p className="mt-3 max-w-xs text-sm text-muted">No tasks here. Add one above when something needs doing.</p>
         </div>
       ) : (
         <ul className="space-y-1.5">

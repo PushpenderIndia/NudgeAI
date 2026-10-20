@@ -17,8 +17,8 @@ export default async function SettingsPage() {
   return (
     <div>
       <PageHeader
-        title="Settings & Privacy"
-        subtitle="Decide what Nudge can touch, how it sounds, and what happens to your data. You're always in control."
+        title="Settings"
+        subtitle="Connections, permissions, reminders, and your preferences."
       />
       <SettingsPanel settings={dto} />
     </div>

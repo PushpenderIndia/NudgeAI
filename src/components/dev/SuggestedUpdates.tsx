@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Lightbulb, Sparkles, AlertCircle } from "lucide-react";
+import { Lightbulb, FileText, AlertCircle } from "lucide-react";
 import { OwlMark } from "@/components/NudgeLogo";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -40,7 +40,7 @@ export function SuggestedUpdates() {
           <h2 className="font-semibold">Suggested Jira updates from today&apos;s work</h2>
         </div>
         <Button size="sm" variant="secondary" onClick={run} disabled={state === "loading"}>
-          {state === "loading" ? <><OwlMark size={16} animated /> Thinking…</> : <><Sparkles className="h-4 w-4" /> Suggest updates</>}
+          {state === "loading" ? <><OwlMark size={16} /> Give me a moment…</> : <><FileText className="h-4 w-4" /> Review updates</>}
         </Button>
       </div>
 

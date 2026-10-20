@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import {
   Mail,
-  Sparkles,
+  PenLine,
   Send,
   Pencil,
   RotateCw,
@@ -188,7 +188,7 @@ export function InboxView({ initialEmails }: { initialEmails: EmailDTO[] }) {
           {untriaged > 0 ? `${untriaged} email${untriaged === 1 ? "" : "s"} waiting to be sorted` : "Inbox sorted"}
         </p>
         <Button size="sm" onClick={triageInbox} disabled={triaging || untriaged === 0}>
-          {triaging ? <><OwlMark size={16} animated /> Sorting…</> : <><Sparkles className="h-4 w-4" /> Triage inbox</>}
+          {triaging ? <><OwlMark size={16} /> Sorting…</> : <><Check className="h-4 w-4" /> Sort inbox</>}
         </Button>
       </div>
 
@@ -241,7 +241,7 @@ export function InboxView({ initialEmails }: { initialEmails: EmailDTO[] }) {
           {!selected ? (
             <EmptyDetail />
           ) : (
-            <div className="rounded-2xl border border-border bg-surface">
+            <div className="rounded-lg border border-border bg-surface">
               <div className="border-b border-border p-5">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -272,7 +272,7 @@ export function InboxView({ initialEmails }: { initialEmails: EmailDTO[] }) {
                 {!drafts[selected.id] ? (
                   <div className="flex flex-wrap items-center gap-2">
                     <Button onClick={() => draftReply(selected)} disabled={drafting}>
-                      {drafting ? <><OwlMark size={16} animated /> Drafting…</> : <><Sparkles className="h-4 w-4" /> Draft a reply</>}
+                      {drafting ? <><OwlMark size={16} /> Drafting…</> : <><PenLine className="h-4 w-4" /> Draft a reply</>}
                     </Button>
                     <TonePicker value={tones[selected.id] ?? "friendly"} onChange={(t) => setTones((s) => ({ ...s, [selected.id]: t }))} />
                   </div>
@@ -330,7 +330,7 @@ function EmailRow({ email, active, onClick }: { email: EmailDTO; active: boolean
       onClick={onClick}
       className={cn(
         "flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors",
-        active ? "border-primary/50 bg-surface-2 glow-primary" : "border-border bg-surface hover:bg-surface-2/60"
+        active ? "border-primary/50 bg-surface-2" : "border-border bg-surface hover:bg-surface-2/60"
       )}
     >
       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-2 text-[11px] font-semibold text-primary-soft">
@@ -340,7 +340,7 @@ function EmailRow({ email, active, onClick }: { email: EmailDTO; active: boolean
         <p className="truncate text-sm font-medium">{email.fromName}</p>
         <p className="truncate text-xs text-muted">{email.subject}</p>
       </div>
-      {email.triage === "urgent" && <span className="h-2 w-2 shrink-0 rounded-full bg-nudge glow-nudge" />}
+      {email.triage === "urgent" && <span className="h-2 w-2 shrink-0 rounded-full bg-nudge" />}
     </button>
   );
 }
@@ -366,9 +366,9 @@ function TonePicker({ value, onChange }: { value: string; onChange: (t: string) 
 
 function EmptyDetail() {
   return (
-    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-surface/50 px-6 py-20 text-center">
+    <div className="flex flex-col items-center justify-center border-y border-border px-6 py-16 text-center">
       <InboxIcon className="h-8 w-8 text-muted" />
-      <p className="mt-3 max-w-xs text-sm text-muted">Select an email to see Nudge's triage and draft a reply.</p>
+      <p className="mt-3 max-w-xs text-sm text-muted">Select an email to see Nudge&apos;s triage and draft a reply.</p>
     </div>
   );
 }

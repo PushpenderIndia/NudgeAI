@@ -124,7 +124,7 @@ export function SettingsPanel({ settings }: { settings: SettingsDTO }) {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Plug className="h-4 w-4 text-primary-soft" /> Connections</CardTitle>
-          <CardDescription>Set how far Nudge can go with each tool. Read-only means it can look but never act.</CardDescription>
+          <CardDescription>Choose what each connected tool lets me read, prepare, or change.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {TOOLS.map((tool) => {
@@ -149,7 +149,7 @@ export function SettingsPanel({ settings }: { settings: SettingsDTO }) {
       <Card>
         <CardHeader>
           <CardTitle>Data source</CardTitle>
-          <CardDescription>Demo data works with no credentials. Live connection needs tokens (see the README).</CardDescription>
+          <CardDescription>Use sample data here, or switch to connected tools when they are ready.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-between rounded-xl border border-border bg-surface-2/30 p-3">
@@ -173,7 +173,7 @@ export function SettingsPanel({ settings }: { settings: SettingsDTO }) {
       <Card>
         <CardHeader>
           <CardTitle>Your details</CardTitle>
-          <CardDescription>How Nudge greets you and the default tone for drafted replies.</CardDescription>
+          <CardDescription>How I greet you and the tone I use for drafted replies.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
@@ -205,7 +205,7 @@ export function SettingsPanel({ settings }: { settings: SettingsDTO }) {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Clock className="h-4 w-4 text-primary-soft" /> Reminders</CardTitle>
-          <CardDescription>When Nudge should nudge you. Saved when you click away.</CardDescription>
+          <CardDescription>When reminders should appear. Changes save when you click away.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 sm:grid-cols-3">
           {[

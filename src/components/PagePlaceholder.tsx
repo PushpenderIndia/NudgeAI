@@ -13,12 +13,9 @@ export function PagePlaceholder({ title, helper }: { title: string; helper: stri
   return (
     <div>
       <PageHeader title={title} subtitle={helper} />
-      <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-surface/50 px-6 py-20 text-center">
-        <OwlMark size={56} animated />
-        <p className="mt-4 max-w-sm text-sm text-muted">
-          This is where <span className="text-fg">{title}</span> will live. Nudge is still
-          getting this part ready — check back soon.
-        </p>
+      <div className="flex flex-col items-center justify-center border-y border-border px-6 py-16 text-center">
+        <OwlMark size={48} />
+        <p className="mt-3 max-w-sm text-sm text-muted">Nothing here yet. I&apos;ll keep this space tidy.</p>
       </div>
     </div>
   );

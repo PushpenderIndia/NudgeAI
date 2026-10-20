@@ -37,7 +37,7 @@ export function JiraBoard({ issues }: { issues: JiraDTO[] }) {
           const items = byStatus(col);
           if (items.length === 0) return null;
           return (
-            <div key={col} className="rounded-2xl border border-border bg-surface/60 p-3">
+            <div key={col} className="rounded-lg border border-border bg-surface/60 p-3">
               <div className="mb-2 flex items-center gap-2">
                 <Badge variant={STATUS_VARIANT[col] ?? "default"}>{col}</Badge>
                 <span className="text-xs text-muted">{items.length}</span>

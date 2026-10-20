@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Sparkles, Check, X, ArrowRight, AlertCircle } from "lucide-react";
+import { FileText, Check, X, ArrowRight, AlertCircle } from "lucide-react";
 import { OwlMark } from "@/components/NudgeLogo";
 import { Button } from "@/components/ui/button";
 
@@ -58,13 +58,13 @@ export function ClosingCommentCard({ issueKey }: { issueKey: string }) {
     <div className="mt-3 rounded-xl border border-border bg-surface-2/30 p-3">
       {state === "idle" && (
         <Button size="sm" variant="secondary" onClick={draft}>
-          <Sparkles className="h-4 w-4" /> Draft closing comment
+          <FileText className="h-4 w-4" /> Draft closing comment
         </Button>
       )}
 
       {state === "loading" && (
         <div className="flex items-center gap-2 text-sm text-muted">
-          <OwlMark size={18} animated /> Drafting a closing comment…
+          <OwlMark size={18} /> Drafting a closing comment…
         </div>
       )}
 
@@ -82,7 +82,7 @@ export function ClosingCommentCard({ issueKey }: { issueKey: string }) {
           </p>
           <div className="flex gap-2">
             <Button size="sm" variant="success" onClick={approve} disabled={state === "posting"}>
-              {state === "posting" ? <><OwlMark size={14} animated /> Posting…</> : <><Check className="h-4 w-4" /> Approve &amp; post</>}
+              {state === "posting" ? <><OwlMark size={14} /> Posting…</> : <><Check className="h-4 w-4" /> Approve &amp; post</>}
             </Button>
             <Button size="sm" variant="ghost" onClick={() => setState("idle")}>
               <X className="h-4 w-4" /> Discard

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Clock, Users, FileText, ListPlus, Copy, Check, Sparkles, AlertCircle } from "lucide-react";
+import { Clock, Users, FileText, ListPlus, Copy, Check, PenLine, AlertCircle } from "lucide-react";
 import { OwlMark } from "@/components/NudgeLogo";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -106,11 +106,11 @@ export function MeetingCard({ meeting }: { meeting: MeetingDTO }) {
           <Button size="sm" onClick={generate} disabled={state === "loading"}>
             {state === "loading" ? (
               <>
-                <OwlMark size={16} animated /> Thinking…
+                <OwlMark size={16} /> Give me a moment…
               </>
             ) : (
               <>
-                <Sparkles className="h-4 w-4" /> {state === "done" ? "Regenerate MoM" : "Generate MoM"}
+                <PenLine className="h-4 w-4" /> {state === "done" ? "Rewrite the minutes" : "Write the minutes"}
               </>
             )}
           </Button>
@@ -121,8 +121,8 @@ export function MeetingCard({ meeting }: { meeting: MeetingDTO }) {
 
       {state === "loading" && (
         <div className="flex items-center gap-3 border-t border-border bg-surface-2/30 px-5 py-6 text-sm text-muted">
-          <OwlMark size={28} animated />
-          Nudge is reading the transcript and writing your minutes…
+          <OwlMark size={28} />
+          I&apos;m reading the transcript and writing the minutes…
         </div>
       )}
 

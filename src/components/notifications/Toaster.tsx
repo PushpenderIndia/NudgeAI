@@ -16,7 +16,7 @@ export function Toaster() {
       {toasts.map((t) => (
         <div
           key={t.id}
-          className="pointer-events-auto flex items-start gap-3 rounded-2xl border border-border bg-surface-2 px-4 py-3 shadow-lg animate-fade-up glow-primary"
+          className="pointer-events-auto flex items-start gap-3 rounded-lg border border-border bg-surface-2 px-4 py-3 animate-fade-up"
         >
           <OwlMark size={22} urgent={t.kind === "nudge"} />
           <p className="flex-1 text-sm text-fg">{t.message}</p>

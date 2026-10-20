@@ -3,7 +3,6 @@
 import { useState } from "react";
 import {
   FileText,
-  Sparkles,
   RotateCw,
   Copy,
   Download,
@@ -83,14 +82,14 @@ export function WeeklyEditor() {
 
   if (!sections) {
     return (
-      <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-surface/50 px-6 py-16 text-center">
-        <OwlMark size={56} animated />
+      <div className="flex flex-col items-center justify-center border-y border-border px-6 py-16 text-center">
+        <OwlMark size={48} />
         <p className="mt-4 max-w-sm text-sm text-muted">
-          When you're ready, Nudge will read your week — every meeting, email, commit and Jira
+          When you&apos;re ready, Nudge will read your week — every meeting, email, commit and Jira
           ticket — and write a shareable update with Highlights, Progress, Blockers and Next week.
         </p>
         <Button className="mt-5" onClick={() => generate()} disabled={loading}>
-          {loading ? <><OwlMark size={16} animated /> Pulling your week together…</> : <><Sparkles className="h-4 w-4" /> Generate weekly update</>}
+          {loading ? <><OwlMark size={16} /> Give me a moment…</> : <><FileText className="h-4 w-4" /> Write this week&apos;s update</>}
         </Button>
         {error && <p className="mt-3 text-sm text-danger">{error}</p>}
       </div>
@@ -102,7 +101,7 @@ export function WeeklyEditor() {
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="secondary" size="sm" onClick={() => generate()} disabled={loading}>
-          {loading ? <><OwlMark size={16} animated /> Regenerating…</> : <><RotateCw className="h-4 w-4" /> Regenerate all</>}
+          {loading ? <><OwlMark size={16} /> Updating…</> : <><RotateCw className="h-4 w-4" /> Refresh all</>}
         </Button>
         <Button variant="ghost" size="sm" onClick={copy}>
           {copied ? <Check className="h-4 w-4 text-success" /> : <Copy className="h-4 w-4" />} {copied ? "Copied" : "Copy"}
@@ -128,13 +127,13 @@ export function WeeklyEditor() {
       {error && <p className="text-sm text-danger">{error}</p>}
 
       {SECTIONS.map(({ key, label, icon: Icon, accent }) => (
-        <div key={key} className="rounded-2xl border border-border bg-surface p-5">
+        <div key={key} className="rounded-lg border border-border bg-surface p-4">
           <div className="mb-2 flex items-center justify-between">
             <h3 className={`flex items-center gap-2 font-semibold ${accent}`}>
               <Icon className="h-4 w-4" /> {label}
             </h3>
             <Button variant="ghost" size="sm" onClick={() => generate(key)} disabled={regenerating === key}>
-              {regenerating === key ? <><OwlMark size={14} animated /> …</> : <><RotateCw className="h-3.5 w-3.5" /> Regenerate</>}
+              {regenerating === key ? <><OwlMark size={14} /> …</> : <><RotateCw className="h-3.5 w-3.5" /> Refresh</>}
             </Button>
           </div>
           <Textarea
