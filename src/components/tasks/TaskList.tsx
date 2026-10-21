@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { cn, formatDay } from "@/lib/utils";
+import { AgentTrace, type AgentTraceRun } from "@/components/agents/AgentTrace";
 
 export interface TaskDTO {
   id: string;
@@ -14,6 +15,8 @@ export interface TaskDTO {
   status: "todo" | "done";
   source: "meeting" | "email" | "jira" | "manual";
   due: string | null;
+  createdBy: string;
+  run: AgentTraceRun | null;
 }
 
 type Filter = "all" | "today" | "this_week" | "urgent";
@@ -32,11 +35,13 @@ export function TaskList({ initial }: { initial: TaskDTO[] }) {
   const [filter, setFilter] = useState<Filter>("all");
   const [title, setTitle] = useState("");
   const [priority, setPriority] = useState<TaskDTO["priority"]>("this_week");
+  const [openTask, setOpenTask] = useState<string | null>(null);
   const dragId = useRef<string | null>(null);
 
   const todo = tasks.filter((t) => t.status === "todo");
   const done = tasks.filter((t) => t.status === "done");
   const visible = filter === "all" ? todo : todo.filter((t) => t.priority === filter);
+  const sourceCounts = ["meeting", "email", "jira", "manual"].map((source) => ({ source, count: tasks.filter((task) => task.source === source).length }));
 
   async function toggle(task: TaskDTO) {
     const next = task.status === "done" ? "todo" : "done";
@@ -83,6 +88,11 @@ export function TaskList({ initial }: { initial: TaskDTO[] }) {
 
   return (
     <div>
+      <div className="mb-5 flex flex-wrap items-center gap-2 border-y border-border py-3 text-xs text-muted">
+        <span className="font-medium text-fg">Sources</span>
+        {sourceCounts.map(({ source, count }) => <span key={source}>{source} ({count})</span>)}
+        <span>→</span><span className="font-medium text-fg">Agents</span><span>Scribe · Courier · Tracker · Planner</span><span>→</span><span className="font-medium text-fg">Your tasks</span>
+      </div>
       {/* Add */}
       <div className="mb-5 flex flex-wrap items-center gap-2 border-b border-border bg-surface/40 p-3">
         <Input
@@ -137,7 +147,7 @@ export function TaskList({ initial }: { initial: TaskDTO[] }) {
               onDragStart={() => (dragId.current = task.id)}
               onDragOver={(e) => e.preventDefault()}
               onDrop={() => onDrop(task.id)}
-              className="group flex items-center gap-3 rounded-xl border border-border bg-surface px-3 py-2.5"
+              className="group flex flex-wrap items-center gap-3 border-b border-border px-1 py-3"
             >
               <GripVertical className="h-4 w-4 cursor-grab text-muted/50 group-hover:text-muted" />
               <button
@@ -145,7 +155,7 @@ export function TaskList({ initial }: { initial: TaskDTO[] }) {
                 className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-border hover:border-primary-soft"
                 aria-label="Mark done"
               />
-              <span className="flex-1 text-sm">{task.title}</span>
+              <button className="min-w-0 flex-1 text-left text-sm" onClick={() => setOpenTask(openTask === task.id ? null : task.id)}>{task.title}<span className="mt-1 block text-xs text-muted">{task.createdBy === "You" ? "Added by you" : `${task.source} · ${task.createdBy}`} {task.run && `· ${[...new Set(task.run.steps.map((step) => step.agent))].join(" → ")}`}</span></button>
               {task.due && (
                 <span className="hidden items-center gap-1 text-xs text-muted sm:flex">
                   <CalendarClock className="h-3.5 w-3.5" /> {formatDay(task.due)}
@@ -154,6 +164,7 @@ export function TaskList({ initial }: { initial: TaskDTO[] }) {
               {task.priority === "urgent" && <Badge variant="urgent">Urgent</Badge>}
               {task.priority !== "urgent" && <Badge variant="default">{PRIORITY_LABEL[task.priority]}</Badge>}
               <Badge variant={task.source}>{task.source}</Badge>
+              {openTask === task.id && <div className="basis-full pl-12"><p className="mb-2 text-xs text-muted">Original context: created from {task.source}.</p><AgentTrace run={task.run} /></div>}
             </li>
           ))}
         </ul>

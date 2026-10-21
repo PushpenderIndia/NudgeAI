@@ -64,6 +64,8 @@ export default async function TodayPage() {
           outputSummary: step.outputSummary,
           status: step.status,
           handoffTo: step.handoffTo,
+          startedAt: step.startedAt?.toISOString(),
+          finishedAt: step.finishedAt?.toISOString() ?? null,
         })),
       }))}
     />

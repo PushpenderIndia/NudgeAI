@@ -16,6 +16,7 @@ import { OwlMark } from "@/components/NudgeLogo";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/input";
 import { weeklyToMarkdown } from "@/lib/export/markdown";
+import { AgentTrace, type AgentTraceRun } from "@/components/agents/AgentTrace";
 import type { WeeklyUpdate, WeeklySection } from "@/skills/weekly-update";
 
 const SECTIONS: { key: WeeklySection; label: string; icon: typeof Trophy; accent: string }[] = [
@@ -37,12 +38,13 @@ function download(filename: string, content: string, type: string) {
   URL.revokeObjectURL(url);
 }
 
-export function WeeklyEditor() {
+export function WeeklyEditor({ daily }: { daily: { day: string; bullets: string[] }[] }) {
   const [sections, setSections] = useState<WeeklyUpdate | null>(null);
   const [loading, setLoading] = useState(false);
   const [regenerating, setRegenerating] = useState<WeeklySection | null>(null);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+  const [trace, setTrace] = useState<AgentTraceRun | null>(null);
 
   async function generate(section?: WeeklySection) {
     if (section) setRegenerating(section);
@@ -61,6 +63,7 @@ export function WeeklyEditor() {
       } else {
         setSections(data);
       }
+      if (data.trace) setTrace(data.trace);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong.");
     } finally {
@@ -82,15 +85,10 @@ export function WeeklyEditor() {
 
   if (!sections) {
     return (
-      <div className="flex flex-col items-center justify-center border-y border-border px-6 py-16 text-center">
-        <OwlMark size={48} />
-        <p className="mt-4 max-w-sm text-sm text-muted">
-          When you&apos;re ready, Nudge will read your week — every meeting, email, commit and Jira
-          ticket — and write a shareable update with Highlights, Progress, Blockers and Next week.
-        </p>
-        <Button className="mt-5" onClick={() => generate()} disabled={loading}>
-          {loading ? <><OwlMark size={16} /> Give me a moment…</> : <><FileText className="h-4 w-4" /> Write this week&apos;s update</>}
-        </Button>
+      <div className="space-y-8">
+        <section><h2 className="mb-3 text-base font-semibold">This week, day by day</h2><div className="divide-y divide-border border-y border-border">{daily.map((item, index) => <div key={item.day} className="py-4"><div className="flex items-center justify-between"><h3 className="font-medium">{item.day}</h3>{index === new Date().getDay() - 1 && <span className="text-xs text-primary-soft">In progress</span>}</div>{item.bullets.length ? <ul className="mt-2 space-y-1 text-sm text-fg/80">{item.bullets.map((bullet) => <li key={bullet}>• {bullet}</li>)}</ul> : <p className="mt-2 text-sm text-muted">No connected work recorded.</p>}</div>)}</div></section>
+        <div className="border-t border-border pt-5"><Button className="w-full sm:w-auto" onClick={() => generate()} disabled={loading}>{loading ? <><OwlMark size={16} /> Reporter is compiling…</> : <><FileText className="h-4 w-4" /> Generate weekly update</>}</Button></div>
+        {trace && <AgentTrace run={trace} />}
         {error && <p className="mt-3 text-sm text-danger">{error}</p>}
       </div>
     );
@@ -125,6 +123,7 @@ export function WeeklyEditor() {
       </div>
 
       {error && <p className="text-sm text-danger">{error}</p>}
+      {trace && <AgentTrace collapsed run={trace} />}
 
       {SECTIONS.map(({ key, label, icon: Icon, accent }) => (
         <div key={key} className="rounded-lg border border-border bg-surface p-4">

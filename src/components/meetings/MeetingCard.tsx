@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Clock, Users, FileText, ListPlus, Copy, Check, PenLine, AlertCircle } from "lucide-react";
+import { Clock, Users, FileText, ListPlus, Copy, Check, PenLine, AlertCircle, RefreshCw } from "lucide-react";
 import { OwlMark } from "@/components/NudgeLogo";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { formatTime } from "@/lib/utils";
+import { AgentTrace, type AgentTraceRun } from "@/components/agents/AgentTrace";
 
 interface Mom {
   summary: string;
@@ -23,6 +24,9 @@ export interface MeetingDTO {
   attendees: string[];
   hasTranscript: boolean;
   hasMom: boolean;
+  isToday?: boolean;
+  prep?: { lastTimeSummary: string; openItems: { title: string; owner: string; due: string }[]; relatedEmails: string[]; relatedIssues: string[]; talkingPoints: string[]; status: string } | null;
+  run?: AgentTraceRun | null;
 }
 
 function momToMarkdown(title: string, mom: Mom): string {
@@ -99,8 +103,18 @@ export function MeetingCard({ meeting }: { meeting: MeetingDTO }) {
             <span className="flex items-center gap-1">
               <Users className="h-3.5 w-3.5" /> {meeting.attendees.length} people
             </span>
-            {meeting.hasMom && <Badge variant="success">Minutes ready</Badge>}
+            <Badge variant={meeting.hasMom ? "success" : meeting.prep?.status === "working" ? "default" : "success"}>{meeting.hasMom ? "Minutes ready" : meeting.prep?.status === "working" ? "Prep in progress" : "Prep ready"}</Badge>
           </div>
+
+          {meeting.isToday && meeting.prep && (
+            <div className="space-y-3 border-t border-border px-5 py-4 text-sm">
+              <div><p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">Prep brief</p><p className="text-fg/85">{meeting.prep.lastTimeSummary}</p></div>
+              {meeting.prep.openItems.length > 0 && <div><p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">Open actions</p>{meeting.prep.openItems.map((item) => <p key={item.title} className="py-0.5 text-fg/80">{item.title} <span className="text-xs text-muted">· {item.owner} · {item.due}</span></p>)}</div>}
+              <p className="text-xs text-muted">{[...meeting.prep.relatedEmails, ...meeting.prep.relatedIssues].join(" · ")}</p>
+              <div><p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">Talking points</p>{meeting.prep.talkingPoints.map((point) => <p key={point} className="py-0.5 text-fg/80">• {point}</p>)}</div>
+              <Button size="sm" variant="ghost"><RefreshCw className="h-3.5 w-3.5" /> Refresh prep</Button>
+            </div>
+          )}
         </div>
         {meeting.hasTranscript ? (
           <Button size="sm" onClick={generate} disabled={state === "loading"}>
@@ -185,6 +199,7 @@ export function MeetingCard({ meeting }: { meeting: MeetingDTO }) {
               {copied ? "Copied" : "Copy as Markdown"}
             </Button>
           </div>
+          <AgentTrace collapsed run={meeting.run ?? null} />
         </div>
       )}
     </Card>

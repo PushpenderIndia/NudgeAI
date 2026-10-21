@@ -1,23 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Check,
   ChevronDown,
   ChevronRight,
-  Clock3,
-  FileText,
-  GitBranch,
-  Mail,
   Play,
-  RefreshCw,
   Send,
-  Users,
 } from "lucide-react";
 import { OwlMark } from "@/components/NudgeLogo";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { AgentTrace } from "@/components/agents/AgentTrace";
 
 type Prep = {
   status: "queued" | "working" | "ready";
@@ -30,7 +24,7 @@ type Prep = {
   talkingPoints: string[];
 };
 type Meeting = { id: string; title: string; time: string; startsAt: string; attendees: string[]; past: boolean; hasMom: boolean; prep: Prep | null };
-type Run = { id: string; title: string; status: string; startedAt: string; steps: { agent: string; action: string; tool: string; model: string; inputSummary: string; outputSummary: string; status: string; handoffTo: string | null }[] };
+type Run = { id: string; title: string; status: string; startedAt: string; steps: { id?: string; agent: string; action: string; tool: string; model: string; inputSummary: string; outputSummary: string; status: "running" | "done" | "failed"; handoffTo: string | null; startedAt?: string; finishedAt?: string | null }[] };
 
 const CREW = [
   ["Scribe", "FileText", "Meeting notes and actions"],
@@ -40,12 +34,6 @@ const CREW = [
   ["Historian", "Clock3", "Context from past work"],
   ["Reporter", "Send", "Weekly reporting"],
 ] as const;
-
-function Icon({ name }: { name: string }) {
-  const icons = { FileText, Mail, GitBranch, Check, Clock3, Send };
-  const Component = icons[name as keyof typeof icons] ?? FileText;
-  return <Component className="h-4 w-4" />;
-}
 
 export function TodayDashboard({
   userName,
@@ -66,7 +54,6 @@ export function TodayDashboard({
   const [pending, setPending] = useState(initialPending);
   const [runs, setRuns] = useState(initialRuns);
   const [openRun, setOpenRun] = useState<string | null>(initialRuns[0]?.id ?? null);
-  const [openMeeting, setOpenMeeting] = useState<string | null>(meetings.find((m) => !m.past)?.id ?? null);
   const [busy, setBusy] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [agentFilter, setAgentFilter] = useState<string | null>(null);
@@ -143,6 +130,22 @@ export function TodayDashboard({
       <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_260px]">
         <main className="min-w-0 space-y-8">
           <section>
+            <SectionTitle title="Today’s insights" detail={<button className="text-xs text-primary-soft hover:underline" onClick={() => router.refresh()}>Refresh insights</button>} />
+            <ul className="space-y-2 border-y border-border py-4 text-sm text-fg/85">
+              {meetings.slice(0, 1).map((meeting) => <li key={meeting.id}>• {meeting.title} at {meeting.time.split(" – ")[0]}{meeting.prep?.lastTimeSummary ? `: ${meeting.prep.lastTimeSummary}` : " is on your calendar."}</li>)}
+              {pending.slice(0, 1).map((item) => <li key={item.id}>• {item.title}: {item.why}</li>)}
+              {tasks.slice(0, 2).map((task) => <li key={task.id}>• {task.title} came from {task.source} and is waiting in your task list.</li>)}
+              {!meetings.length && !pending.length && !tasks.length && <li>• Getting your day ready…</li>}
+            </ul>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              {CREW.map(([name]) => {
+                const status = workingAgent === name ? "working" : name === "Courier" && pending.length ? "waiting" : "idle";
+                return <button key={name} onClick={() => setAgentFilter(agentFilter === name ? null : name)} className="flex items-center gap-1.5 text-xs text-muted hover:text-fg"><span className={cn("h-2 w-2 rounded-full", status === "working" ? "animate-pulse bg-primary" : status === "waiting" ? "bg-nudge" : "bg-muted/50")} />{name}</button>;
+              })}
+              <button className="text-xs text-primary-soft hover:underline" onClick={() => setOpenRun(openRun ?? runs[0]?.id ?? null)}>View agent activity</button>
+            </div>
+          </section>
+          <section>
             <SectionTitle title="Needs your OK" detail={pending.length ? `${pending.length} waiting` : "All clear"} />
             {pending.length === 0 ? <EmptyLine text="Nothing is waiting for your approval." /> : (
               <div className="divide-y divide-border border-y border-border">
@@ -160,50 +163,28 @@ export function TodayDashboard({
                       </div>
                     </div>
                     <p className="mt-3 border-l-2 border-border pl-3 text-sm text-fg/80">{item.preview}</p>
+                    <AgentTrace collapsed run={runs.find((run) => run.status === "waiting_for_user") ? {
+                      ...runs.find((run) => run.status === "waiting_for_user")!,
+                      steps: runs.find((run) => run.status === "waiting_for_user")!.steps,
+                    } : null} />
                   </div>
                 ))}
               </div>
             )}
           </section>
 
-          <section>
-            <SectionTitle title="Your day" detail={`${meetings.length} meetings`} />
-            <div className="divide-y divide-border border-y border-border">
-              {meetings.map((meeting) => <MeetingRow key={meeting.id} meeting={meeting} open={openMeeting === meeting.id} onToggle={() => setOpenMeeting(openMeeting === meeting.id ? null : meeting.id)} />)}
-            </div>
-          </section>
-
-          <section>
-            <SectionTitle title="Tasks today" detail={`${tasks.length} open`} />
-            <div className="divide-y divide-border border-y border-border">
-              {tasks.length ? tasks.map((task) => (
-                <div key={task.id} className="flex items-center gap-3 py-3">
-                  <span className="h-4 w-4 rounded border border-border" />
-                  <span className="flex-1 text-sm">{task.title}</span>
-                  <span className="text-xs text-muted">{task.source} · {task.createdBy}</span>
-                </div>
-              )) : <EmptyLine text="No tasks for today." />}
-            </div>
-          </section>
         </main>
 
         <aside className="space-y-6">
           <section>
-            <SectionTitle title="Crew" detail="6 agents" />
-            <div className="grid grid-cols-2 gap-x-3 border-y border-border">
-              {CREW.map(([name, icon, role]) => {
-                const working = workingAgent === name;
-                const waiting = name === "Courier" && pending.length > 0;
-                return <button key={name} className={cn("flex w-full items-center gap-2 border-b border-border py-2.5 text-left hover:bg-surface-2/40", agentFilter === name && "bg-surface-2/40")} onClick={() => setAgentFilter(agentFilter === name ? null : name)}>
-                  <span className={cn("h-2 w-2 rounded-full", working ? "bg-primary animate-pulse" : waiting ? "bg-nudge" : "bg-muted/50")} />
-                  <span className="flex h-6 w-6 items-center justify-center rounded-md border border-border text-primary-soft"><Icon name={icon} /></span>
-                  <span className="min-w-0 flex-1"><span className="block text-xs font-medium">{name}</span><span className="block truncate text-[10px] text-muted">{working ? "Working" : waiting ? "Waiting" : role}</span></span>
-                </button>;
-              })}
+            <SectionTitle title="To-do tasks" detail={agentFilter ? `Filtered to ${agentFilter}` : `${tasks.length} open`} />
+            <div className="divide-y divide-border border-y border-border">
+              {tasks.length ? tasks.map((task) => <div key={task.id} className="flex items-start gap-2 py-3"><span className="mt-0.5 h-4 w-4 rounded border border-border" /><span className="min-w-0 flex-1 text-sm">{task.title}<span className="mt-1 block text-xs text-muted">{task.source} · {task.createdBy}</span></span></div>) : <EmptyLine text="All caught up." />}
             </div>
+            <button className="mt-3 text-xs text-primary-soft hover:underline" onClick={() => router.push("/tasks")}>View all tasks</button>
           </section>
           <section>
-            <SectionTitle title="Recent work" detail={agentFilter ? `Filtered to ${agentFilter}` : undefined} />
+            <SectionTitle title="Agent activity" detail={agentFilter ? `Filtered to ${agentFilter}` : undefined} />
             <div className="divide-y divide-border border-y border-border">
               {visibleRuns.length ? visibleRuns.map((run) => <RunRow key={run.id} run={run} open={openRun === run.id} onToggle={() => setOpenRun(openRun === run.id ? null : run.id)} />) : <EmptyLine text="Getting your day ready…" />}
             </div>
@@ -214,29 +195,10 @@ export function TodayDashboard({
   );
 }
 
-function SectionTitle({ title, detail }: { title: string; detail?: string }) {
+function SectionTitle({ title, detail }: { title: string; detail?: ReactNode }) {
   return <div className="mb-3 flex items-baseline justify-between"><h2 className="text-base font-semibold">{title}</h2>{detail && <span className="text-xs text-muted">{detail}</span>}</div>;
 }
 function EmptyLine({ text }: { text: string }) { return <p className="border-y border-border py-5 text-sm text-muted">{text}</p>; }
-function MeetingRow({ meeting, open, onToggle }: { meeting: Meeting; open: boolean; onToggle: () => void }) {
-  const prep = meeting.prep;
-  return <div className="py-3">
-    <button className="flex w-full items-start gap-3 text-left" onClick={onToggle}>
-      <span className="w-28 shrink-0 text-xs text-muted">{meeting.time}</span>
-      <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary" />
-      <span className="min-w-0 flex-1"><span className="block text-sm font-medium">{meeting.title}</span><span className="mt-1 flex items-center gap-1 text-xs text-muted"><Users className="h-3 w-3" /> {meeting.attendees.length} attendees</span></span>
-      <span className="hidden text-xs text-primary-soft sm:block">{meeting.past && meeting.hasMom ? "Minutes ready" : prep?.status === "ready" ? "Prep ready" : prep?.status === "working" ? "Prep in progress…" : "Prep queued"}</span>
-      {open ? <ChevronDown className="h-4 w-4 text-muted" /> : <ChevronRight className="h-4 w-4 text-muted" />}
-    </button>
-    {open && prep && <div className="ml-32 mt-4 space-y-4 border-l border-border pl-4 text-sm">
-      <div><p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">Last time</p><p className="text-fg/80">{prep.lastTimeSummary}</p></div>
-      <div><p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">Open items</p>{prep.openItems.map((item) => <p key={item.title} className="flex gap-2 py-1 text-fg/80"><span className="h-4 w-4 rounded border border-border" />{item.title} <span className="text-xs text-muted">· {item.owner} · {item.due}</span></p>)}</div>
-      <div><p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">Related</p><p className="text-xs text-muted">{[...prep.relatedEmails, ...prep.relatedIssues, ...prep.relatedCommits].join(" · ")}</p></div>
-      <div><p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">Talking points</p>{prep.talkingPoints.map((point) => <p key={point} className="py-0.5 text-fg/80">• {point}</p>)}</div>
-      <Button size="sm" variant="ghost"><RefreshCw className="h-3.5 w-3.5" /> Refresh prep</Button>
-    </div>}
-  </div>;
-}
 function RunRow({ run, open, onToggle }: { run: Run; open: boolean; onToggle: () => void }) {
   const chain = [...new Set(run.steps.map((step) => step.agent))].join(" → ") || "Nudge";
   return <div className="py-3">
