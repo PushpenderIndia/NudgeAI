@@ -66,7 +66,8 @@ export async function POST(req: Request) {
     await db.update(agentRuns).set({ status: "done", finishedAt: new Date() }).where(eq(agentRuns.id, run.id));
 
     await logActivity({ action: "Wrote weekly update", summary: "Compiled your week into a report" });
-    return NextResponse.json({ ...sections, runId: run.id });
+    const traceSteps = await db.select().from(agentSteps).where(eq(agentSteps.runId, run.id)).orderBy(agentSteps.seq);
+    return NextResponse.json({ ...sections, runId: run.id, trace: { id: run.id, title: section ? `Regenerate weekly ${section}` : "Compile weekly update", status: "done", steps: traceSteps } });
   } catch (err) {
     if (err instanceof NudgeAIError) {
       return NextResponse.json({ error: err.code, message: err.friendly }, { status: 502 });
