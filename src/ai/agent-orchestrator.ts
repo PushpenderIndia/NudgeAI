@@ -159,9 +159,10 @@ export async function runWorkflow(workflow: Workflow, existingRunId?: string) {
             actionType: "send_email",
             summary,
             payload: { to: email.fromEmail, subject: `Re: ${email.subject}`, body: reply },
+            runId,
           }).returning({ id: pendingActions.id });
       await step(runId, 4, { agent: "Planner", action: "Create urgent follow-up", tool: "tasks", tier: "fast", inputSummary: email.subject, outputSummary: "Urgent follow-up is ready in Today’s tasks.", handoffTo: "Nudge" });
-      await db.insert(tasks).values({ title: `Reply to ${email.subject}`, priority: "urgent", source: "email", sourceId: email.id, sortOrder: 0 });
+      await db.insert(tasks).values({ title: `Reply to ${email.subject}`, priority: "urgent", source: "email", sourceId: email.id, runId, sortOrder: 0 });
       await logActivity({ action: "Courier prepared a reply", summary: `Waiting for your OK on ${email.subject}`, entityType: "agent_run", entityId: runId });
       await finishRun(runId, "waiting_for_user");
       return { runId, actionId: action[0].id };
@@ -174,7 +175,7 @@ export async function runWorkflow(workflow: Workflow, existingRunId?: string) {
       await step(runId, 2, { agent: "Scribe", action: "Write minutes", tool: "drafts", tier: "heavy", inputSummary: "Turn transcript into minutes.", outputSummary: "Minutes and action items prepared.", handoffTo: "Planner" });
       await step(runId, 3, { agent: "Planner", action: "Add action items", tool: "tasks", tier: "fast", inputSummary: "Extracted actions from the minutes.", outputSummary: "Action items added to Today’s tasks.", handoffTo: "Nudge" });
       await db.update(meetings).set({ hasMom: true }).where(eq(meetings.id, meeting.id));
-      await db.insert(tasks).values({ title: "Review meeting action items", priority: "today", source: "meeting", sourceId: meeting.id, sortOrder: 0 });
+      await db.insert(tasks).values({ title: "Review meeting action items", priority: "today", source: "meeting", sourceId: meeting.id, runId, sortOrder: 0 });
       await logActivity({ action: "Scribe wrote meeting notes", summary: `Planner added actions from ${meeting.title}`, entityType: "agent_run", entityId: runId });
       await finishRun(runId, "done");
       return { runId };
@@ -193,6 +194,7 @@ export async function runWorkflow(workflow: Workflow, existingRunId?: string) {
           actionType: "send_email",
           summary: `Reply to ${email.fromName}: ${email.subject}`,
           payload: { to: email.fromEmail, subject: `Re: ${email.subject}`, body: "Thanks for the note. I’m reviewing the Atlas summary and will share an update today." },
+          runId,
         });
       }
     }

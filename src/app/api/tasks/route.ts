@@ -23,6 +23,7 @@ export async function POST(req: Request) {
       title,
       priority: (priority as TaskPriority) ?? "this_week",
       source: "manual",
+      runId: null,
       due: due ? new Date(due) : null,
       sortOrder: Date.now(),
     })

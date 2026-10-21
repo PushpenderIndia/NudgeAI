@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { meetings, emails, tasks, jiraIssues, gitActivity, drafts } from "@/db/schema";
+import { agentRuns, agentSteps, meetings, emails, tasks, jiraIssues, gitActivity, drafts } from "@/db/schema";
 import { runSkill } from "@/ai/orchestrator";
 import { weeklyUpdateSkill, type WeeklySection } from "@/skills/weekly-update";
 import { logActivity } from "@/lib/activity";
@@ -14,6 +14,26 @@ export async function POST(req: Request) {
   const { section } = (await req.json().catch(() => ({}))) as { section?: WeeklySection };
 
   try {
+    const [run] = await db.insert(agentRuns).values({
+      trigger: "weekly_update",
+      title: section ? `Regenerate weekly ${section}` : "Compile weekly update",
+      status: "running",
+    }).returning({ id: agentRuns.id });
+    const startedAt = new Date();
+    await db.insert(agentSteps).values({
+      runId: run.id,
+      seq: 1,
+      agent: "Reporter",
+      action: section ? `Regenerate ${section}` : "Compile daily work into a report",
+      tool: "Memory, meetings, email, GitHub, Jira",
+      model: "Nemotron Ultra",
+      inputSummary: section ? `Focus on ${section}.` : "Review this week's connected work.",
+      outputSummary: "Editable weekly draft is ready.",
+      status: "done",
+      startedAt,
+      finishedAt: new Date(),
+      handoffTo: "Nudge",
+    });
     const mtgs = await db.select().from(meetings);
     const emailRows = await db.select().from(emails);
     const git = await db.select().from(gitActivity);
@@ -39,13 +59,14 @@ export async function POST(req: Request) {
       .where(and(eq(drafts.kind, "weekly"), eq(drafts.targetType, "weekly")))
       .get();
     if (existing) {
-      await db.update(drafts).set({ content, status: "draft", updatedAt: new Date() }).where(eq(drafts.id, existing.id));
+    await db.update(drafts).set({ content, status: "draft", runId: run.id, updatedAt: new Date() }).where(eq(drafts.id, existing.id));
     } else {
-      await db.insert(drafts).values({ kind: "weekly", targetType: "weekly", content, status: "draft" });
+    await db.insert(drafts).values({ kind: "weekly", targetType: "weekly", content, status: "draft", runId: run.id });
     }
+    await db.update(agentRuns).set({ status: "done", finishedAt: new Date() }).where(eq(agentRuns.id, run.id));
 
     await logActivity({ action: "Wrote weekly update", summary: "Compiled your week into a report" });
-    return NextResponse.json(sections);
+    return NextResponse.json({ ...sections, runId: run.id });
   } catch (err) {
     if (err instanceof NudgeAIError) {
       return NextResponse.json({ error: err.code, message: err.friendly }, { status: 502 });

@@ -58,6 +58,7 @@ export const drafts = sqliteTable("drafts", {
   content: text("content").notNull(),
   tone: text("tone"),
   status: text("status").$type<DraftStatus>().notNull().default("draft"),
+  runId: text("run_id"),
   createdAt: createdAt(),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).$defaultFn(() => new Date()),
 });
@@ -77,6 +78,7 @@ export const tasks = sqliteTable("tasks", {
   status: text("status").$type<TaskStatus>().notNull().default("todo"),
   source: text("source").$type<TaskSource>().notNull().default("manual"),
   sourceId: text("source_id"),
+  runId: text("run_id"),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: createdAt(),
 });
@@ -128,6 +130,7 @@ export const pendingActions = sqliteTable("pending_actions", {
   payload: text("payload", { mode: "json" }).$type<Record<string, unknown>>().notNull(),
   status: text("status").$type<ActionStatus>().notNull().default("pending"),
   draftId: text("draft_id"),
+  runId: text("run_id"),
   createdAt: createdAt(),
   executedAt: integer("executed_at", { mode: "timestamp_ms" }),
 });

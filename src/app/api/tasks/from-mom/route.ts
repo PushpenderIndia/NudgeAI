@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { tasks } from "@/db/schema";
+import { agentRuns, tasks } from "@/db/schema";
+import { desc, eq } from "drizzle-orm";
 import { logActivity } from "@/lib/activity";
 
 export const runtime = "nodejs";
@@ -23,6 +24,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "empty", message: "No action items to add." }, { status: 400 });
   }
 
+  const momRun = await db.select({ id: agentRuns.id }).from(agentRuns)
+    .where(eq(agentRuns.trigger, "meeting_ended"))
+    .orderBy(desc(agentRuns.startedAt)).limit(1).get();
   const rows = actionItems.map((item, i) => {
     const dueLc = (item.due ?? "").toLowerCase();
     const priority = dueLc.includes("today") ? ("today" as const) : ("this_week" as const);
@@ -32,6 +36,7 @@ export async function POST(req: Request) {
       priority,
       source: "meeting" as const,
       sourceId: meetingId,
+      runId: momRun?.id ?? null,
       sortOrder: Date.now() + i,
     };
   });

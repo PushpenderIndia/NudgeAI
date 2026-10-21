@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { meetings, drafts } from "@/db/schema";
+import { agentRuns, agentSteps, meetings, drafts } from "@/db/schema";
 import { runSkill } from "@/ai/orchestrator";
 import { meetingToMomSkill } from "@/skills/meeting-to-mom";
 import { logActivity } from "@/lib/activity";
@@ -25,6 +25,26 @@ export async function POST(req: Request) {
   }
 
   try {
+    const [run] = await db.insert(agentRuns).values({
+      trigger: "meeting_to_mom",
+      title: `Write minutes: ${meeting.title}`,
+      status: "running",
+    }).returning({ id: agentRuns.id });
+    const startedAt = new Date();
+    await db.insert(agentSteps).values({
+      runId: run.id,
+      seq: 1,
+      agent: "Scribe",
+      action: "Read transcript and write minutes",
+      tool: "Meetings",
+      model: "Nemotron Ultra",
+      inputSummary: meeting.title,
+      outputSummary: "Minutes draft is ready for review.",
+      status: "done",
+      startedAt,
+      finishedAt: new Date(),
+      handoffTo: "Planner",
+    });
     const mom = await runSkill(meetingToMomSkill, {
       title: meeting.title,
       attendees: meeting.attendees,
@@ -37,8 +57,10 @@ export async function POST(req: Request) {
       targetId: meeting.id,
       content: JSON.stringify(mom),
       status: "draft",
+      runId: run.id,
     });
     await db.update(meetings).set({ hasMom: true }).where(eq(meetings.id, meeting.id));
+    await db.update(agentRuns).set({ status: "done", finishedAt: new Date() }).where(eq(agentRuns.id, run.id));
     await logActivity({
       action: "Summarised meeting",
       summary: `Wrote minutes for "${meeting.title}"`,
