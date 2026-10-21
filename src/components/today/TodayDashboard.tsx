@@ -57,21 +57,22 @@ export function TodayDashboard({
   const [busy, setBusy] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [agentFilter, setAgentFilter] = useState<string | null>(null);
+  const activeRunId = runs.find((run) => run.status === "running")?.id ?? null;
 
   useEffect(() => {
-    const active = runs.find((run) => run.status === "running");
-    if (!active) return;
-    const source = new EventSource(`/api/agents/stream?runId=${active.id}`);
+    if (!activeRunId) return;
+    const source = new EventSource(`/api/agents/stream?runId=${activeRunId}`);
     source.onmessage = (event) => {
       const data = JSON.parse(event.data) as { runs: Run[]; steps: Run["steps"] };
-      if (data.runs[0]) setRuns((current) => current.map((run) => run.id === active.id ? { ...run, ...data.runs[0], steps: data.steps } : run));
+      if (data.runs[0]) setRuns((current) => current.map((run) => run.id === activeRunId ? { ...run, ...data.runs[0], steps: data.steps } : run));
       if (data.runs[0]?.status !== "running") {
         source.close();
         router.refresh();
       }
     };
+    source.onerror = () => source.close();
     return () => source.close();
-  }, [runs, router]);
+  }, [activeRunId, router]);
 
   const workingAgent = runs.find((run) => run.status === "running")?.steps.at(-1)?.agent;
   const statusLine = workingAgent
