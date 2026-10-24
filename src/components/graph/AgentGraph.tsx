@@ -6,6 +6,7 @@ import { Controls, ReactFlow, type NodeTypes } from "@xyflow/react";
 import type { RunView } from "@/lib/agent-runs";
 import type { AgentName } from "@/nudge/types";
 import { cn } from "@/lib/utils";
+import { AgentDrawer } from "./AgentDrawer";
 import { AgentNode } from "./AgentNode";
 import { useLiveRun, usePacedRun, useRunGraph } from "./hooks";
 
@@ -23,6 +24,8 @@ export type AgentGraphProps = {
   onNodeClick?: (agent: AgentName) => void;
   /** Use this run instead of fetching one (e.g. a parent that already follows it). */
   run?: RunView | null;
+  /** Open the steps drawer on node click (default true). */
+  drawer?: boolean;
   className?: string;
 };
 
@@ -56,19 +59,21 @@ const THEME = {
  * The agent team for one run: Nudge in the centre, the six specialists around it.
  * Read-only; nodes light up as they work and edges animate on each handoff.
  */
-export function AgentGraph({ runId, variant, initial = null, live = false, onNodeClick, run: given, className }: AgentGraphProps) {
+export function AgentGraph({ runId, variant, initial = null, live = false, onNodeClick, run: given, drawer = true, className }: AgentGraphProps) {
   const controlled = given !== undefined;
   const followed = useLiveRun(controlled ? null : runId, initial, live && !controlled);
   const run = usePacedRun(controlled ? given : followed, live ? 600 : 0);
   const { nodes, edges } = useRunGraph(run);
-  const [, setSelected] = useState<AgentName | null>(null);
+  const [selected, setSelected] = useState<AgentName | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const open = useCallback(
     (agent: AgentName) => {
       setSelected(agent);
+      if (drawer) setDrawerOpen(true);
       onNodeClick?.(agent);
     },
-    [onNodeClick]
+    [drawer, onNodeClick]
   );
   const compact = variant === "panel";
   const shown = useMemo(() => nodes.map((n) => ({ ...n, data: { ...n.data, compact, onOpen: open } })), [nodes, compact, open]);
@@ -100,6 +105,7 @@ export function AgentGraph({ runId, variant, initial = null, live = false, onNod
       >
         {interactive && <Controls showInteractive={false} position="bottom-right" className="overflow-hidden rounded-lg border border-border" />}
       </ReactFlow>
+      {drawer && <AgentDrawer run={run} agent={selected} open={drawerOpen} onOpenChange={setDrawerOpen} />}
     </div>
   );
 }
