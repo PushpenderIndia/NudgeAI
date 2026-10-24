@@ -1,6 +1,6 @@
-import { asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, gte, lt } from "drizzle-orm";
 import { db } from "@/db";
-import { agentRuns, agentSteps, meetingPrep, meetings, pendingActions, tasks } from "@/db/schema";
+import { activityLog, agentRuns, agentSteps, emails, meetingPrep, meetings, pendingActions, reminders, tasks } from "@/db/schema";
 import { getSettings } from "@/lib/settings";
 import { formatTime } from "@/lib/utils";
 import { ensureDayStarted } from "@/ai/agent-orchestrator";
@@ -13,11 +13,26 @@ export default async function TodayPage() {
   const settings = await getSettings();
   const dayStart = new Date();
   dayStart.setHours(0, 0, 0, 0);
+  const yesterdayStart = new Date(dayStart);
+  yesterdayStart.setDate(yesterdayStart.getDate() - 1);
   const rows = (await db.select().from(meetings).orderBy(asc(meetings.startsAt)))
     .filter((meeting) => meeting.endsAt >= dayStart);
   const prepRows = await db.select().from(meetingPrep);
   const todoRows = await db.select().from(tasks).where(eq(tasks.status, "todo")).orderBy(asc(tasks.sortOrder));
   const pendingRows = await db.select().from(pendingActions).where(eq(pendingActions.status, "pending"));
+  const replyRows = await db
+    .select()
+    .from(emails)
+    .where(eq(emails.isSent, false))
+    .orderBy(desc(emails.receivedAt))
+    .limit(12);
+  const reminderRows = await db.select().from(reminders).where(eq(reminders.enabled, true));
+  const yesterdayRows = await db
+    .select()
+    .from(activityLog)
+    .where(and(gte(activityLog.createdAt, yesterdayStart), lt(activityLog.createdAt, dayStart)))
+    .orderBy(desc(activityLog.createdAt))
+    .limit(4);
   const runs = await db.select().from(agentRuns).orderBy(desc(agentRuns.startedAt)).limit(12);
   const steps = await db.select().from(agentSteps).orderBy(desc(agentSteps.startedAt)).limit(80);
 
@@ -32,6 +47,7 @@ export default async function TodayPage() {
   return (
     <TodayDashboard
       userName={settings.userName}
+      dateLabel={new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric" }).format(new Date())}
       demoMode={settings.mode === "demo"}
       meetings={rows.map((meeting) => ({
         id: meeting.id,
@@ -48,6 +64,24 @@ export default async function TodayPage() {
         title: task.title,
         source: task.source,
         createdBy: task.source === "email" ? "Courier" : task.source === "meeting" ? "Planner" : "You",
+      }))}
+      replies={replyRows.filter((email) => email.triage !== "fyi").slice(0, 4).map((email) => ({
+        id: email.id,
+        sender: email.fromName,
+        subject: email.subject,
+        preview: email.body.replace(/\s+/g, " ").slice(0, 120),
+        receivedAt: email.receivedAt.toISOString(),
+      }))}
+      reminders={reminderRows.map((reminder) => ({
+        id: reminder.id,
+        kind: reminder.kind,
+        schedule: reminder.schedule,
+        message: reminder.message,
+      }))}
+      yesterdayInsights={yesterdayRows.map((entry) => ({
+        id: entry.id,
+        summary: entry.summary,
+        action: entry.action,
       }))}
       pending={pending}
       runs={runs.map((run) => ({

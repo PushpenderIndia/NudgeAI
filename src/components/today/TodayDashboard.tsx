@@ -3,15 +3,20 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
+  ArrowRight,
+  Bell,
+  CalendarDays,
   ChevronDown,
   ChevronRight,
+  Clock3,
+  Mail,
   Play,
   Send,
+  Sparkles,
 } from "lucide-react";
 import { OwlMark } from "@/components/NudgeLogo";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { AgentTrace } from "@/components/agents/AgentTrace";
 
 type Prep = {
   status: "queued" | "working" | "ready";
@@ -25,6 +30,8 @@ type Prep = {
 };
 type Meeting = { id: string; title: string; time: string; startsAt: string; attendees: string[]; past: boolean; hasMom: boolean; prep: Prep | null };
 type Run = { id: string; title: string; status: string; startedAt: string; steps: { id?: string; agent: string; action: string; tool: string; model: string; inputSummary: string; outputSummary: string; status: "running" | "done" | "failed"; handoffTo: string | null; startedAt?: string; finishedAt?: string | null }[] };
+type Reply = { id: string; sender: string; subject: string; preview: string; receivedAt: string };
+type Reminder = { id: string; kind: string; schedule: string; message: string };
 
 const CREW = [
   ["Scribe", "FileText", "Meeting notes and actions"],
@@ -37,16 +44,24 @@ const CREW = [
 
 export function TodayDashboard({
   userName,
+  dateLabel,
   demoMode,
   meetings,
   tasks,
+  replies,
+  reminders,
+  yesterdayInsights,
   pending: initialPending,
   runs: initialRuns,
 }: {
   userName: string;
+  dateLabel: string;
   demoMode: boolean;
   meetings: Meeting[];
   tasks: { id: string; title: string; source: string; createdBy: string }[];
+  replies: Reply[];
+  reminders: Reminder[];
+  yesterdayInsights: { id: string; summary: string; action: string }[];
   pending: { id: string; title: string; why: string; preview: string }[];
   runs: Run[];
 }) {
@@ -103,12 +118,13 @@ export function TodayDashboard({
   const visibleRuns = useMemo(() => agentFilter ? runs.filter((run) => run.steps.some((step) => step.agent === agentFilter)) : runs, [agentFilter, runs]);
 
   return (
-    <div className="space-y-8">
-      <header className="flex flex-wrap items-start justify-between gap-4 border-b border-border pb-5">
+    <div className="space-y-7">
+      <header className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex items-center gap-3">
-          <OwlMark size={42} />
+          <OwlMark size={44} />
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Good morning, {userName}</h1>
+            <p className="mb-1 text-xs font-medium uppercase tracking-[0.18em] text-primary-soft">{dateLabel}</p>
+            <h1 className="text-3xl font-bold tracking-tight">Good morning, {userName}</h1>
             <p className="mt-1 text-sm text-muted">{statusLine}</p>
           </div>
         </div>
@@ -128,16 +144,59 @@ export function TodayDashboard({
         )}
       </header>
 
-      <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_260px]">
-        <main className="min-w-0 space-y-8">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <main className="min-w-0 space-y-5">
+          <section className="grid gap-5 md:grid-cols-2">
+            <div className="rounded-2xl border border-border bg-surface p-5">
+              <SectionTitle title="Yesterday’s insights" detail={<Sparkles className="h-4 w-4 text-primary-soft" />} />
+              <div className="space-y-3">
+                {yesterdayInsights.length ? yesterdayInsights.map((insight) => (
+                  <div key={insight.id} className="flex gap-3 text-sm">
+                    <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary" />
+                    <div><p className="text-fg/90">{insight.summary}</p><p className="mt-1 text-xs text-muted">{insight.action}</p></div>
+                  </div>
+                )) : <p className="text-sm text-muted">No new activity was logged yesterday.</p>}
+              </div>
+            </div>
+            <div className="rounded-2xl border border-primary/30 bg-primary/10 p-5">
+              <SectionTitle title="Today at a glance" detail={<button className="text-xs text-primary-soft hover:underline" onClick={() => router.refresh()}>Refresh</button>} />
+              <div className="grid grid-cols-3 gap-3">
+                <Metric icon={<CalendarDays />} value={meetings.length} label="meetings" />
+                <Metric icon={<Mail />} value={replies.length} label="to reply" />
+                <Metric icon={<Bell />} value={reminders.length} label="nudges" />
+              </div>
+              <p className="mt-4 text-sm text-fg/80">{meetings[0] ? `Next up: ${meetings[0].title} at ${meetings[0].time.split(" – ")[0]}.` : "Your calendar is clear for now."}</p>
+            </div>
+          </section>
+          <section className="rounded-2xl border border-border bg-surface p-5">
+            <SectionTitle title="Today’s reminders" detail={`${reminders.length} active`} />
+            <div className="grid gap-3 sm:grid-cols-3">
+              {reminders.map((reminder) => <div key={reminder.id} className="rounded-xl border border-border/80 bg-bg/40 p-3.5"><div className="flex items-center justify-between"><Bell className="h-4 w-4 text-nudge" /><span className="text-[11px] font-medium uppercase tracking-wide text-muted">{reminder.schedule}</span></div><p className="mt-3 text-sm leading-5 text-fg/90">{reminder.message}</p></div>)}
+              {!reminders.length && <p className="text-sm text-muted">No reminders are active.</p>}
+            </div>
+          </section>
+          <section className="rounded-2xl border border-border bg-surface p-5">
+            <SectionTitle title="Mail to reply" detail={<button className="text-xs text-primary-soft hover:underline" onClick={() => router.push("/inbox")}>Open inbox <ArrowRight className="ml-1 inline h-3 w-3" /></button>} />
+            <div className="divide-y divide-border">
+              {replies.map((reply) => <div key={reply.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0"><span className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary-soft">{reply.sender.split(" ").map((part) => part[0]).join("").slice(0, 2)}</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{reply.subject}</p><p className="mt-1 truncate text-xs text-muted">{reply.sender} · {reply.preview}</p></div><Clock3 className="mt-1 h-3.5 w-3.5 shrink-0 text-muted" /></div>)}
+              {!replies.length && <EmptyLine text="No replies are waiting." />}
+            </div>
+          </section>
+          <section className="rounded-2xl border border-nudge/30 bg-nudge/5 p-5">
+            <SectionTitle title="Needs your approval" detail={pending.length ? `${pending.length} waiting` : "All clear"} />
+            {pending.length === 0 ? <EmptyLine text="Nothing is waiting for your approval." /> : (
+              <div className="divide-y divide-border/70">
+                {pending.map((item) => (
+                  <div key={item.id} className="py-3 first:pt-0 last:pb-0">
+                    <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-medium">{item.title}</p><p className="mt-1 text-xs text-muted">{item.why}</p></div><div className="flex gap-2"><Button size="sm" onClick={() => approve(item.id)}><Send className="h-3.5 w-3.5" /> Approve</Button><Button size="sm" variant="ghost">Edit</Button></div></div>
+                    <p className="mt-2 line-clamp-2 border-l-2 border-nudge/50 pl-3 text-sm text-fg/75">{item.preview}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
           <section>
-            <SectionTitle title="Today’s insights" detail={<button className="text-xs text-primary-soft hover:underline" onClick={() => router.refresh()}>Refresh insights</button>} />
-            <ul className="space-y-2 border-y border-border py-4 text-sm text-fg/85">
-              {meetings.slice(0, 1).map((meeting) => <li key={meeting.id}>• {meeting.title} at {meeting.time.split(" – ")[0]}{meeting.prep?.lastTimeSummary ? `: ${meeting.prep.lastTimeSummary}` : " is on your calendar."}</li>)}
-              {pending.slice(0, 1).map((item) => <li key={item.id}>• {item.title}: {item.why}</li>)}
-              {tasks.slice(0, 2).map((task) => <li key={task.id}>• {task.title} came from {task.source} and is waiting in your task list.</li>)}
-              {!meetings.length && !pending.length && !tasks.length && <li>• Getting your day ready…</li>}
-            </ul>
+            <SectionTitle title="Your crew" detail={<button className="text-xs text-primary-soft hover:underline" onClick={() => setOpenRun(openRun ?? runs[0]?.id ?? null)}>View activity</button>} />
             <div className="mt-4 flex flex-wrap items-center gap-3">
               {CREW.map(([name]) => {
                 const status = workingAgent === name ? "working" : name === "Courier" && pending.length ? "waiting" : "idle";
@@ -146,47 +205,20 @@ export function TodayDashboard({
               <button className="text-xs text-primary-soft hover:underline" onClick={() => setOpenRun(openRun ?? runs[0]?.id ?? null)}>View agent activity</button>
             </div>
           </section>
-          <section>
-            <SectionTitle title="Needs your OK" detail={pending.length ? `${pending.length} waiting` : "All clear"} />
-            {pending.length === 0 ? <EmptyLine text="Nothing is waiting for your approval." /> : (
-              <div className="divide-y divide-border border-y border-border">
-                {pending.map((item) => (
-                  <div key={item.id} className="py-4">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p className="font-medium">{item.title}</p>
-                        <p className="mt-1 text-xs text-muted">{item.why}</p>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button size="sm" onClick={() => approve(item.id)}><Send className="h-3.5 w-3.5" /> Approve</Button>
-                        <Button size="sm" variant="ghost">Edit</Button>
-                        <Button size="sm" variant="ghost">Skip</Button>
-                      </div>
-                    </div>
-                    <p className="mt-3 border-l-2 border-border pl-3 text-sm text-fg/80">{item.preview}</p>
-                    <AgentTrace collapsed run={runs.find((run) => run.status === "waiting_for_user") ? {
-                      ...runs.find((run) => run.status === "waiting_for_user")!,
-                      steps: runs.find((run) => run.status === "waiting_for_user")!.steps,
-                    } : null} />
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
 
         </main>
 
-        <aside className="space-y-6">
+        <aside className="space-y-5">
           <section>
             <SectionTitle title="To-do tasks" detail={agentFilter ? `Filtered to ${agentFilter}` : `${tasks.length} open`} />
-            <div className="divide-y divide-border border-y border-border">
+            <div className="rounded-2xl border border-border bg-surface px-4 divide-y divide-border">
               {tasks.length ? tasks.map((task) => <div key={task.id} className="flex items-start gap-2 py-3"><span className="mt-0.5 h-4 w-4 rounded border border-border" /><span className="min-w-0 flex-1 text-sm">{task.title}<span className="mt-1 block text-xs text-muted">{task.source} · {task.createdBy}</span></span></div>) : <EmptyLine text="All caught up." />}
             </div>
             <button className="mt-3 text-xs text-primary-soft hover:underline" onClick={() => router.push("/tasks")}>View all tasks</button>
           </section>
           <section>
             <SectionTitle title="Agent activity" detail={agentFilter ? `Filtered to ${agentFilter}` : undefined} />
-            <div className="divide-y divide-border border-y border-border">
+            <div className="rounded-2xl border border-border bg-surface px-4 divide-y divide-border">
               {visibleRuns.length ? visibleRuns.map((run) => <RunRow key={run.id} run={run} open={openRun === run.id} onToggle={() => setOpenRun(openRun === run.id ? null : run.id)} />) : <EmptyLine text="Getting your day ready…" />}
             </div>
           </section>
@@ -198,6 +230,9 @@ export function TodayDashboard({
 
 function SectionTitle({ title, detail }: { title: string; detail?: ReactNode }) {
   return <div className="mb-3 flex items-baseline justify-between"><h2 className="text-base font-semibold">{title}</h2>{detail && <span className="text-xs text-muted">{detail}</span>}</div>;
+}
+function Metric({ icon, value, label }: { icon: ReactNode; value: number; label: string }) {
+  return <div><div className="flex items-center gap-1.5 text-2xl font-semibold">{icon && <span className="h-4 w-4 text-primary-soft">{icon}</span>}{value}</div><p className="mt-1 text-[11px] text-muted">{label}</p></div>;
 }
 function EmptyLine({ text }: { text: string }) { return <p className="border-y border-border py-5 text-sm text-muted">{text}</p>; }
 function RunRow({ run, open, onToggle }: { run: Run; open: boolean; onToggle: () => void }) {
