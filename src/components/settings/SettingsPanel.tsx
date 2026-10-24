@@ -1,76 +1,49 @@
 "use client";
 
-import { useState } from "react";
-import {
-  Plug,
-  Shield,
-  Download,
-  Trash2,
-  Clock,
-  Mail,
-  SquareKanban,
-  MessagesSquare,
-  GitBranch,
-  Check,
-  type LucideIcon,
-} from "lucide-react";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Square, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+import { WebSpeechProvider, listVoices, speechSupported, type VoiceOption } from "@/nudge/voice";
+import { VOICE_RATES, useVoicePrefs, type BriefingMode, type VoiceRate } from "@/nudge/voice/prefs";
 
-type Permission = "read" | "draft" | "act";
-type Mode = "demo" | "live";
+const SAMPLE_LINE = "Good morning. I checked your PRs, tickets and calendar. Here is what matters first.";
 
-export interface SettingsDTO {
-  mode: Mode;
-  userName: string;
-  toneDefault: string;
-  permissions: Record<string, Permission>;
-  reminderSchedule: Record<string, string>;
-}
-
-const TOOLS: { key: string; label: string; icon: LucideIcon }[] = [
-  { key: "teams", label: "Teams / Calendar", icon: MessagesSquare },
-  { key: "email", label: "Email", icon: Mail },
-  { key: "github", label: "GitHub", icon: GitBranch },
-  { key: "jira", label: "Jira", icon: SquareKanban },
+const BRIEFING_OPTIONS: { key: BriefingMode; label: string }[] = [
+  { key: "always", label: "Always" },
+  { key: "daily", label: "Once a day" },
+  { key: "off", label: "Off" },
 ];
 
-const PERMS: { key: Permission; label: string }[] = [
-  { key: "read", label: "Read only" },
-  { key: "draft", label: "Read + draft" },
-  { key: "act", label: "Act with approval" },
-];
+const BRIEFING_HINT: Record<BriefingMode, string> = {
+  always: "I speak the briefing every time you open Today.",
+  daily: "I speak the briefing on your first visit each day. Replay it any time.",
+  off: "I never start speaking on my own. Press Start my day when you want me.",
+};
 
-const TONES = ["formal", "friendly", "concise"];
-
-async function patch(body: Record<string, unknown>) {
-  await fetch("/api/settings", {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-}
-
-function Segmented<T extends string>({
+function Segmented<T extends string | number>({
   value,
   options,
   onChange,
+  label,
 }: {
   value: T;
   options: { key: T; label: string }[];
   onChange: (v: T) => void;
+  label: string;
 }) {
   return (
-    <div className="grid grid-cols-3 gap-1 rounded-xl border border-border bg-surface-2/40 p-1">
+    <div role="radiogroup" aria-label={label} className="inline-flex rounded-lg border border-border bg-surface-2/40 p-0.5">
       {options.map((o) => (
         <button
           key={o.key}
+          type="button"
+          role="radio"
+          aria-checked={value === o.key}
           onClick={() => onChange(o.key)}
           className={cn(
-            "rounded-lg px-2 py-1.5 text-[11px] font-medium transition-colors",
+            "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
             value === o.key ? "bg-primary text-white" : "text-muted hover:text-fg"
           )}
         >
@@ -81,183 +54,126 @@ function Segmented<T extends string>({
   );
 }
 
-export function SettingsPanel({ settings }: { settings: SettingsDTO }) {
-  const [mode, setMode] = useState<Mode>(settings.mode);
-  const [userName, setUserName] = useState(settings.userName);
-  const [tone, setTone] = useState(settings.toneDefault);
-  const [permissions, setPermissions] = useState(settings.permissions);
-  const [schedule, setSchedule] = useState(settings.reminderSchedule);
-  const [deleted, setDeleted] = useState(false);
-  const [saved, setSaved] = useState(false);
+function Section({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
+  return (
+    <section>
+      <h2 className="text-sm font-semibold text-fg">{title}</h2>
+      {description && <p className="mt-0.5 text-xs text-muted">{description}</p>}
+      <div className="mt-3 divide-y divide-border border-y border-border">{children}</div>
+    </section>
+  );
+}
 
-  function flashSaved() {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1200);
+function Field({ label, hint, children }: { label: string; hint?: ReactNode; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-2 px-1 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+      <div className="min-w-0">
+        <p className="text-sm font-medium text-fg">{label}</p>
+        {hint && <p className="mt-0.5 text-xs text-muted">{hint}</p>}
+      </div>
+      <div className="shrink-0">{children}</div>
+    </div>
+  );
+}
+
+function VoiceSettings() {
+  const { prefs, update } = useVoicePrefs();
+  const [voices, setVoices] = useState<VoiceOption[] | null>(null);
+  const [speaking, setSpeaking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const voice = useRef<WebSpeechProvider | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    listVoices()
+      .then((list) => live && setVoices(list))
+      .catch(() => live && setVoices([]));
+    return () => {
+      live = false;
+      voice.current?.cancel();
+    };
+  }, []);
+
+  async function test() {
+    if (speaking) {
+      voice.current?.cancel();
+      setSpeaking(false);
+      return;
+    }
+    setError(null);
+    const v = (voice.current ??= new WebSpeechProvider());
+    v.unlock();
+    setSpeaking(true);
+    try {
+      await v.speak(SAMPLE_LINE, { rate: prefs.rate, voiceURI: prefs.voiceURI });
+    } catch {
+      setError("Your browser would not play speech. Captions still work.");
+    } finally {
+      setSpeaking(false);
+    }
   }
 
-  function setPerm(tool: string, perm: Permission) {
-    const next = { ...permissions, [tool]: perm };
-    setPermissions(next);
-    patch({ permissions: { [tool]: perm } }).then(flashSaved);
-  }
-
-  function setReminder(key: string, value: string) {
-    const next = { ...schedule, [key]: value };
-    setSchedule(next);
-  }
-
-  async function deleteAll() {
-    if (!confirm("Delete all your data? This clears meetings, emails, tasks, drafts and memory. You can restore the demo with `npm run seed`.")) return;
-    await fetch("/api/settings/delete-all", { method: "POST" });
-    setDeleted(true);
-  }
+  const supported = voices !== null && speechSupported();
+  const selected = voices?.some((v) => v.voiceURI === prefs.voiceURI) ? prefs.voiceURI : "";
 
   return (
-    <div className="space-y-5">
-      {saved && (
-        <div className="fixed bottom-5 right-5 z-20 flex items-center gap-2 rounded-xl border border-success/40 bg-success/10 px-3 py-2 text-sm text-success animate-fade-up">
-          <Check className="h-4 w-4" /> Saved
-        </div>
-      )}
-
-      {/* Connections */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Plug className="h-4 w-4 text-primary-soft" /> Connections</CardTitle>
-          <CardDescription>Choose what each connected tool lets me read, prepare, or change.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {TOOLS.map((tool) => {
-            const Icon = tool.icon;
-            return (
-              <div key={tool.key} className="flex flex-col gap-2 rounded-xl border border-border bg-surface-2/30 p-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="h-2 w-2 rounded-full bg-nudge" title="Demo data" />
-                  <Icon className="h-4 w-4 text-primary-soft" />
-                  <span className="text-sm font-medium">{tool.label}</span>
-                </div>
-                <div className="sm:w-80">
-                  <Segmented value={permissions[tool.key] ?? "draft"} options={PERMS} onChange={(p) => setPerm(tool.key, p)} />
-                </div>
-              </div>
-            );
-          })}
-        </CardContent>
-      </Card>
-
-      {/* Mode */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Data source</CardTitle>
-          <CardDescription>Use sample data here, or switch to connected tools when they are ready.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between rounded-xl border border-border bg-surface-2/30 p-3">
-            <div>
-              <p className="text-sm font-medium">{mode === "live" ? "Live connection" : "Demo data"}</p>
-              <p className="text-xs text-muted">{mode === "live" ? "Nudge uses your real connected tools." : "Nudge uses realistic sample data."}</p>
-            </div>
-            <Switch
-              checked={mode === "live"}
-              onCheckedChange={(v) => {
-                const next: Mode = v ? "live" : "demo";
-                setMode(next);
-                patch({ mode: next }).then(flashSaved);
-              }}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Your details */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Your details</CardTitle>
-          <CardDescription>How I greet you and the tone I use for drafted replies.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-muted">Your name</label>
-            <Input
-              value={userName}
-              onChange={(e) => setUserName(e.target.value)}
-              onBlur={() => patch({ userName }).then(flashSaved)}
-              className="max-w-xs"
-            />
-          </div>
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-muted">Default reply tone</label>
-            <div className="max-w-xs">
-              <Segmented
-                value={tone}
-                options={TONES.map((t) => ({ key: t, label: t[0].toUpperCase() + t.slice(1) }))}
-                onChange={(t) => {
-                  setTone(t);
-                  patch({ toneDefault: t }).then(flashSaved);
-                }}
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Reminders */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Clock className="h-4 w-4 text-primary-soft" /> Reminders</CardTitle>
-          <CardDescription>When reminders should appear. Changes save when you click away.</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-3">
-          {[
-            { key: "timesheet", label: "Timesheet" },
-            { key: "eod", label: "End-of-day check-in" },
-            { key: "weekly", label: "Weekly report" },
-          ].map((r) => (
-            <div key={r.key}>
-              <label className="mb-1.5 block text-xs font-medium text-muted">{r.label}</label>
-              <Input
-                value={schedule[r.key] ?? ""}
-                onChange={(e) => setReminder(r.key, e.target.value)}
-                onBlur={() => patch({ reminderSchedule: { [r.key]: schedule[r.key] ?? "" } }).then(flashSaved)}
-                placeholder="e.g. Fri 17:00"
-              />
-            </div>
+    <Section title="Voice" description="How I sound when I brief you. Saved in this browser.">
+      <Field
+        label="Voice"
+        hint={voices === null ? "Loading voices…" : !supported || voices.length === 0 ? "This browser has no English speech voices. I'll show captions instead." : "Recommended local English voices come first."}
+      >
+        <select
+          value={selected}
+          disabled={!voices?.length}
+          onChange={(e) => update({ voiceURI: e.target.value || undefined })}
+          className="h-9 w-full max-w-xs rounded-lg border border-border bg-surface px-2 text-sm text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-soft sm:w-72"
+        >
+          <option value="">Automatic (best available)</option>
+          {voices?.map((v) => (
+            <option key={v.voiceURI} value={v.voiceURI}>
+              {v.name} · {v.lang}
+              {v.recommended ? " · recommended" : v.local ? "" : " · online"}
+            </option>
           ))}
-        </CardContent>
-      </Card>
+        </select>
+      </Field>
+      <Field label="Speed">
+        <Segmented<VoiceRate>
+          label="Speed"
+          value={prefs.rate}
+          options={VOICE_RATES.map((r) => ({ key: r, label: `${r}×` }))}
+          onChange={(rate) => update({ rate })}
+        />
+      </Field>
+      <Field label="Mute by default" hint="Start with captions only. You can unmute during the briefing.">
+        <Switch checked={prefs.mutedByDefault} onCheckedChange={(mutedByDefault) => update({ mutedByDefault })} aria-label="Mute by default" />
+      </Field>
+      <Field label="Test voice" hint={error ?? `“${SAMPLE_LINE}”`}>
+        <Button variant="outline" size="sm" onClick={test} disabled={voices !== null && !supported}>
+          {speaking ? <Square className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+          {speaking ? "Stop" : "Test voice"}
+        </Button>
+      </Field>
+    </Section>
+  );
+}
 
-      {/* Data & privacy */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Shield className="h-4 w-4 text-primary-soft" /> Your data & privacy</CardTitle>
-          <CardDescription>Your data lives in your own local database. You can take it or delete it any time.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="rounded-xl border border-border bg-surface-2/30 p-4 text-sm text-fg/90">
-            <p className="mb-2 font-medium text-primary-soft">How Nudge handles your data</p>
-            <ul className="space-y-1.5 text-muted">
-              <li>• Everything stays in a local database on your machine — nothing is uploaded to Nudge.</li>
-              <li>• Only the text needed for a task is sent to the model to do that task.</li>
-              <li>• Nudge never sends an email, posts a comment or changes a ticket without your approval.</li>
-            </ul>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button asChild variant="secondary">
-              <a href="/api/settings/export" download>
-                <Download className="h-4 w-4" /> Export my data
-              </a>
-            </Button>
-            <Button variant="danger" onClick={deleteAll}>
-              <Trash2 className="h-4 w-4" /> Delete all my data
-            </Button>
-          </div>
-          {deleted && (
-            <p className="text-sm text-muted">
-              Your data was cleared. Run <code className="rounded bg-surface-2 px-1.5 py-0.5 text-primary-soft">npm run seed</code> to restore the demo, then refresh.
-            </p>
-          )}
-        </CardContent>
-      </Card>
+function BriefingSettings() {
+  const { prefs, update } = useVoicePrefs();
+  return (
+    <Section title="Voice briefing">
+      <Field label="Speak the briefing" hint={BRIEFING_HINT[prefs.briefing]}>
+        <Segmented label="Voice briefing" value={prefs.briefing} options={BRIEFING_OPTIONS} onChange={(briefing) => update({ briefing })} />
+      </Field>
+    </Section>
+  );
+}
+
+export function SettingsPanel() {
+  return (
+    <div className="max-w-3xl space-y-8">
+      <VoiceSettings />
+      <BriefingSettings />
     </div>
   );
 }

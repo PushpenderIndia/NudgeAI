@@ -1,26 +1,13 @@
-import { getSettings } from "@/lib/settings";
 import { PageHeader } from "@/components/PagePlaceholder";
-import { SettingsPanel, type SettingsDTO } from "@/components/settings/SettingsPanel";
+import { SettingsPanel } from "@/components/settings/SettingsPanel";
 
 export const dynamic = "force-dynamic";
 
-export default async function SettingsPage() {
-  const s = await getSettings();
-  const dto: SettingsDTO = {
-    mode: s.mode,
-    userName: s.userName,
-    toneDefault: s.toneDefault,
-    permissions: s.permissions,
-    reminderSchedule: s.reminderSchedule,
-  };
-
+export default function SettingsPage() {
   return (
     <div>
-      <PageHeader
-        title="Settings"
-        subtitle="Connections, permissions, reminders, and your preferences."
-      />
-      <SettingsPanel settings={dto} />
+      <PageHeader title="Settings" subtitle="Voice, briefing and connections." />
+      <SettingsPanel />
     </div>
   );
 }
