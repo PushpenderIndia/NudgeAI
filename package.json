@@ -11,6 +11,7 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "seed": "tsx src/db/seed.ts",
+    "demo:fallback": "tsx scripts/demo-fallback.ts",
     "setup": "drizzle-kit push && tsx src/db/seed.ts",
     "models": "node --env-file=.env --import tsx src/ai/list-models.ts"
   },

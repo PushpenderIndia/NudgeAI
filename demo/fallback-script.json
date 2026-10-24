@@ -1,1 +1,173 @@
-{ "scenes": [] }
+{
+  "scenes": [
+    {
+      "id": "welcome",
+      "agent": "Nudge",
+      "speech": "Morning, Aarav. Ready to start your day?",
+      "captionHighlights": [
+        "Aarav"
+      ],
+      "reveals": [
+        {
+          "section": "welcome"
+        }
+      ]
+    },
+    {
+      "id": "team",
+      "agent": "Nudge",
+      "speech": "Give me a moment while my team looks through your day.",
+      "captionHighlights": [],
+      "reveals": [
+        {
+          "section": "graph"
+        }
+      ]
+    },
+    {
+      "id": "catch",
+      "agent": "Tracker",
+      "speech": "You opened PR 212 for NUD-142, but the ticket still says To Do. Want me to move it to In Review?",
+      "captionHighlights": [
+        "PR 212",
+        "NUD-142",
+        "To Do",
+        "In Review"
+      ],
+      "reveals": [
+        {
+          "section": "catch",
+          "itemIds": [
+            "NUD-142"
+          ]
+        }
+      ],
+      "interaction": {
+        "type": "confirm",
+        "pendingActionId": "{{catchActionId}}"
+      }
+    },
+    {
+      "id": "picks",
+      "agent": "Planner",
+      "speech": "I'd pick from these three today. NUD-150 is due today with a customer escalation, NUD-147 unblocks Priya, and NUD-153 fits before your 2 pm sprint planning. Which one first?",
+      "captionHighlights": [
+        "NUD-150",
+        "NUD-147",
+        "NUD-153",
+        "Priya"
+      ],
+      "reveals": [
+        {
+          "section": "picks",
+          "itemIds": [
+            "NUD-150",
+            "NUD-147",
+            "NUD-153"
+          ]
+        }
+      ],
+      "interaction": {
+        "type": "choice",
+        "options": [
+          {
+            "id": "NUD-150",
+            "label": "Fix 500 on /invoices export"
+          },
+          {
+            "id": "NUD-147",
+            "label": "Review Priya's auth refactor PR #209"
+          },
+          {
+            "id": "NUD-153",
+            "label": "Add pagination to /orders"
+          }
+        ]
+      }
+    },
+    {
+      "id": "plan",
+      "agent": "Planner",
+      "speech": "Okay, NUD-150 first. You've got until 10:30, then standup, then a clear stretch till 2 pm. I'll put NUD-147 after standup so Priya is unblocked by lunch.",
+      "captionHighlights": [
+        "NUD-150",
+        "NUD-147",
+        "10:30",
+        "2 pm"
+      ],
+      "reveals": [
+        {
+          "section": "plan",
+          "itemIds": [
+            "NUD-150",
+            "NUD-147",
+            "NUD-153"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "standup",
+      "agent": "Reporter",
+      "speech": "Here's your standup: 3 points for yesterday, 4 for today, no blockers. Anything you want to change?",
+      "captionHighlights": [
+        "3 points",
+        "4 for today"
+      ],
+      "reveals": [
+        {
+          "section": "standup"
+        }
+      ],
+      "interaction": {
+        "type": "edit"
+      }
+    },
+    {
+      "id": "post",
+      "agent": "Reporter",
+      "speech": "Post this to team-standup?",
+      "captionHighlights": [
+        "team-standup"
+      ],
+      "reveals": [
+        {
+          "section": "post"
+        }
+      ],
+      "interaction": {
+        "type": "confirm",
+        "pendingActionId": "{{postActionId}}"
+      }
+    },
+    {
+      "id": "inbox",
+      "agent": "Courier",
+      "speech": "One more thing: Support emailed: Brightline Logistics can't export invoices. I've drafted a reply saying you're on it. It's waiting for your OK.",
+      "captionHighlights": [
+        "Support"
+      ],
+      "reveals": [
+        {
+          "section": "inbox",
+          "itemIds": [
+            "mail-support"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "wrapup",
+      "agent": "Nudge",
+      "speech": "That's your day, starting with NUD-150. I'm here if anything changes.",
+      "captionHighlights": [
+        "NUD-150"
+      ],
+      "reveals": [
+        {
+          "section": "wrapup"
+        }
+      ]
+    }
+  ]
+}

@@ -30,7 +30,7 @@ export function sceneIdsFor(b: Briefing): SceneId[] {
 }
 
 const highlights = (speech: string, terms: (string | undefined | null)[]) =>
-  [...new Set(terms.filter((t): t is string => Boolean(t) && speech.includes(t!)))];
+  [...new Set(terms.filter((t): t is string => Boolean(t) && t!.length > 1 && speech.includes(t!)))];
 
 /** The short label a choice option shows: the ticket title, trimmed. */
 export const optionLabel = (title: string) => (title.length > 40 ? `${title.slice(0, 38).trimEnd()}…` : title);
@@ -75,8 +75,8 @@ export function buildTemplateScript(b: Briefing, answers?: BriefingAnswers, tz?:
       const s = b.standup;
       add(
         id,
-        `Here's your standup: ${s.yesterday.length} for yesterday, ${s.today.length} for today${s.blockers.length ? `, ${s.blockers.length} blocker${s.blockers.length === 1 ? "" : "s"}` : ", no blockers"}. Anything you want to change?`,
-        [String(s.yesterday.length), String(s.today.length)],
+        `Here's your standup: ${s.yesterday.length} point${s.yesterday.length === 1 ? "" : "s"} for yesterday, ${s.today.length} for today${s.blockers.length ? `, ${s.blockers.length} blocker${s.blockers.length === 1 ? "" : "s"}` : ", no blockers"}. Anything you want to change?`,
+        [`${s.yesterday.length} point${s.yesterday.length === 1 ? "" : "s"}`, `${s.today.length} for today`],
         [{ section: "standup" }],
         { type: "edit" }
       );
@@ -90,7 +90,7 @@ export function buildTemplateScript(b: Briefing, answers?: BriefingAnswers, tz?:
       const e = b.inbox.email;
       add(
         id,
-        `One more thing: ${firstName(e.from)} emailed about ${e.subject.replace(/^(re|fwd?):\s*/i, "").toLowerCase()}. I've drafted a reply saying you're on it. It's waiting for your OK.`,
+        `One more thing: ${firstName(e.from)} emailed: ${e.subject.replace(/^((re|fwd?|urgent):\s*)+/i, "").replace(/[.!?]+$/, "")}. I've drafted a reply saying you're on it. It's waiting for your OK.`,
         [firstName(e.from), e.linkedTicket],
         [{ section: "inbox", itemIds: [e.id] }]
       );
@@ -107,9 +107,9 @@ export function buildTemplateScript(b: Briefing, answers?: BriefingAnswers, tz?:
 function shortWhy(p: Briefing["picks"][number]) {
   const t = p.tags;
   if (t.includes("due_today") && t.includes("escalation")) return "is due today with a customer escalation";
-  if (t.includes("due_today")) return "is due today";
   if (t.includes("escalation")) return "has a customer escalation";
   if (t.includes("unblocks")) return `unblocks ${p.reason.match(/Unblocks (\w+)/)?.[1] ?? "a teammate"}`;
+  if (t.includes("due_today")) return "is due today";
   const fits = p.reason.match(/fits before your (.+)$/)?.[1];
   if (t.includes("fits_window")) return fits ? `fits before your ${fits}` : "fits your free window";
   return `is ${p.ticket.priority}`;
