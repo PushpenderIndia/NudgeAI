@@ -30,13 +30,15 @@ export type RunView = {
 };
 
 /** How many steps each narrated workflow takes, for "Step 3 of 6". */
-export const RUN_STEP_COUNT: Record<string, number> = { plan_day: 6, urgent_email: 4, meeting_ended: 3 };
+export const RUN_STEP_COUNT: Record<string, number> = { plan_day: 8, urgent_email: 4, meeting_ended: 3, meeting_prep: 3, weekly_update: 2 };
 
 /** What a run is about, for "Courier is working on a new urgent email…". */
 export const RUN_SUBJECT: Record<string, string> = {
   plan_day: "your plan",
   urgent_email: "a new urgent email",
   meeting_ended: "the meeting that just ended",
+  meeting_prep: "your meeting prep",
+  weekly_update: "your weekly update",
 };
 
 /** One line for a finished run in the State C banner. */
@@ -44,6 +46,8 @@ export const RUN_DONE: Record<string, string> = {
   plan_day: "Your plan is updated.",
   urgent_email: "Courier handled the new email.",
   meeting_ended: "Scribe wrote up the meeting.",
+  meeting_prep: "Your meeting prep is ready.",
+  weekly_update: "Your weekly update is drafted.",
 };
 
 type RawDate = Date | string | number | null | undefined;
