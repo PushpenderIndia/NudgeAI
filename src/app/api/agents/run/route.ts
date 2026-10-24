@@ -3,6 +3,8 @@ import { and, desc, gte, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { agentRuns } from "@/db/schema";
 import { startWorkflow } from "@/ai/agent-orchestrator";
+import { startBriefing } from "@/nudge/agents/briefing-run";
+import { getRequestContext } from "@/nudge/session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,6 +15,10 @@ export async function POST(req: Request) {
   const { workflow } = await req.json();
   if (!WORKFLOWS.includes(workflow)) {
     return NextResponse.json({ message: "Unknown workflow." }, { status: 400 });
+  }
+  if (workflow === "plan_day") {
+    const { runId } = await startBriefing(await getRequestContext(), { force: true });
+    return NextResponse.json({ runId });
   }
   return NextResponse.json(await startWorkflow(workflow));
 }
