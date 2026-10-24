@@ -20,7 +20,7 @@ import type { FoundItemKind } from "@/db/schema";
 import { OwlMark } from "@/components/NudgeLogo";
 import { cn } from "@/lib/utils";
 
-const AGENT_ICONS: Record<string, LucideIcon> = {
+export const AGENT_ICONS: Record<string, LucideIcon> = {
   Historian: History,
   Scribe: NotebookPen,
   Courier: Mail,
