@@ -5,7 +5,7 @@ export type InsightView = { id: string; text: string; sourceType: string | null;
 
 export type ApprovalView = {
   id: string;
-  actionType: "send_email" | "post_jira_comment" | "transition_ticket" | "create_timesheet" | "create_task";
+  actionType: import("@/db/schema").ActionType;
   title: string;
   reason: string;
   subject: string | null;

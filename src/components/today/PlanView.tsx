@@ -180,6 +180,7 @@ const TYPE_LABEL: Record<ApprovalView["actionType"], string> = {
   transition_ticket: "Ticket update",
   create_task: "New task",
   create_timesheet: "Timesheet",
+  post_slack: "Slack post",
 };
 
 function Approvals({ items }: { items: ApprovalView[] }) {

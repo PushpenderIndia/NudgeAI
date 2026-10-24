@@ -121,7 +121,8 @@ export type ActionType =
   | "post_jira_comment"
   | "transition_ticket"
   | "create_timesheet"
-  | "create_task";
+  | "create_task"
+  | "post_slack";
 export type ActionStatus = "pending" | "approved" | "rejected" | "executed";
 
 export const pendingActions = sqliteTable("pending_actions", {
@@ -135,6 +136,11 @@ export const pendingActions = sqliteTable("pending_actions", {
   reason: text("reason"),
   createdAt: createdAt(),
   executedAt: integer("executed_at", { mode: "timestamp_ms" }),
+  // "live" or the demo session key; demo actions execute into the Sandbox.
+  sessionKey: text("session_key").notNull().default("live"),
+  approvedVia: text("approved_via").$type<"voice" | "click">(),
+  // Approved actions wait out a short Undo window before they execute.
+  executeAfter: integer("execute_after", { mode: "timestamp_ms" }),
 });
 
 /* ------------------------------------------------------------------ */
@@ -229,6 +235,12 @@ export const agentRuns = sqliteTable("agent_runs", {
   summary: text("summary"),
   startedAt: createdAt(),
   finishedAt: integer("finished_at", { mode: "timestamp_ms" }),
+  sessionKey: text("session_key").notNull().default("live"),
+  // Start-my-day briefing: structured result, spoken scene script and the user's answers.
+  briefing: text("briefing", { mode: "json" }).$type<import("@/nudge/briefing").Briefing>(),
+  sceneScript: text("scene_script", { mode: "json" }).$type<import("@/nudge/scenes").SceneScript>(),
+  scriptSource: text("script_source").$type<"model" | "template" | "fallback">(),
+  answers: text("answers", { mode: "json" }).$type<import("@/nudge/scenes").BriefingAnswers>(),
 });
 
 export const agentSteps = sqliteTable("agent_steps", {
@@ -250,6 +262,14 @@ export const agentSteps = sqliteTable("agent_steps", {
   narration: text("narration").notNull().default(""),
   foundItems: text("found_items", { mode: "json" }).$type<FoundItem[]>().notNull().default([]),
   handoffSummary: text("handoff_summary"),
+});
+
+/** Per-browser demo world (cookie-scoped key), reset by "Reset demo". */
+export const demoSessions = sqliteTable("demo_sessions", {
+  key: text("key").primaryKey(),
+  state: text("state", { mode: "json" }).$type<import("@/nudge/types").DemoState>().notNull(),
+  createdAt: createdAt(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).$defaultFn(() => new Date()),
 });
 
 /** Key takeaways written at the end of a plan_day run. */
@@ -296,3 +316,4 @@ export type AgentRun = typeof agentRuns.$inferSelect;
 export type AgentStep = typeof agentSteps.$inferSelect;
 export type MeetingPrep = typeof meetingPrep.$inferSelect;
 export type Insight = typeof insights.$inferSelect;
+export type DemoSession = typeof demoSessions.$inferSelect;

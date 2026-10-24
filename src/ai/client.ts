@@ -12,8 +12,8 @@ export const NEBIUS_BASE_URL = (
 
 // Heavy = stronger Nemotron for reasoning (MoM, weekly, email drafting).
 // Fast  = smaller Nemotron for triage/classification/reminders.
-export const MODEL_HEAVY = process.env.MODEL_HEAVY ?? "nvidia/nemotron-3-super-120b-a12b";
-export const MODEL_FAST = process.env.MODEL_FAST ?? "nvidia/nemotron-3-super-120b-a12b";
+export const MODEL_HEAVY = process.env.NEBIUS_MODEL_HEAVY ?? process.env.MODEL_HEAVY ?? "nvidia/nemotron-3-super-120b-a12b";
+export const MODEL_FAST = process.env.NEBIUS_MODEL_FAST ?? process.env.MODEL_FAST ?? "nvidia/nemotron-3-super-120b-a12b";
 
 export class NudgeAIError extends Error {
   constructor(
