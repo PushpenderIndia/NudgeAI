@@ -12,6 +12,7 @@ import { useLiveRun, usePacedRun, useRunGraph } from "./hooks";
 
 export { usePacedSteps, usePacedRun, useRunGraph, useLiveRun, deriveHandoffs, AGENT_LAYOUT } from "./hooks";
 export type { AgentNodeData, AgentNodeState, Handoff } from "./hooks";
+export { HandoffChain, handoffAgents } from "./HandoffChain";
 
 export type AgentGraphVariant = "full" | "panel" | "page";
 
