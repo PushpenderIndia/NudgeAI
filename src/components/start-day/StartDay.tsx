@@ -12,9 +12,11 @@ import { OwlAvatar, owlStateFor } from "@/components/briefing/OwlAvatar";
 import { StatusLine } from "@/components/briefing/StatusLine";
 import { useSceneEngine, type InteractionContext, type InteractionResult } from "@/components/briefing/engine/useSceneEngine";
 import type { Via } from "@/components/briefing/engine/intents";
-import { fetchView, startBriefing, type BriefingView } from "./api";
+import { answer, fetchView, startBriefing, type BriefingView } from "./api";
+import { CatchCard } from "./CatchCard";
+import { initialOverrides, resolve, type FlowOverrides } from "./flow";
 import { TeamStage, WelcomeStage, firstName, greeting, runStatus, type Line } from "./Stage";
-import { REVEAL } from "./ui";
+import { REVEAL, refreshSandbox } from "./ui";
 
 type Mode = "loading" | "intro" | "pending" | "briefing" | "settled";
 
@@ -48,6 +50,8 @@ export function StartDay() {
   const [holding, setHolding] = useState(false);
   const [startError, setStartError] = useState(false);
 
+  const [overrides, setOverrides] = useState<FlowOverrides | null>(null);
+  const [undone, setUndone] = useState<string[]>([]);
   const modeRef = useRef<Mode>("loading");
   const viewRef = useRef<BriefingView | null>(null);
   const runRef = useRef<string | null>(null);
@@ -59,6 +63,9 @@ export function StartDay() {
     modeRef.current = next;
     setModeState(next);
   }, []);
+
+  const patchFlow = useCallback((p: FlowOverrides) => setOverrides((o) => ({ ...(o ?? {}), ...p })), []);
+  const markUndone = useCallback((actionId: string) => setUndone((u) => [...u, actionId]), []);
 
   /* --------------------------- run + polling --------------------------- */
 
@@ -152,16 +159,40 @@ export function StartDay() {
   const engineRef = useRef<ReturnType<typeof useSceneEngine> | null>(null);
 
   const onInteraction = async (scene: Scene, intent: Intent, via: Via, ctx: InteractionContext): Promise<InteractionResult> => {
-    void scene;
-    void intent;
-    void via;
-    void ctx;
+    const id = runRef.current;
+    const v = viewRef.current;
+    const b = v?.briefing ?? null;
+    if (!id) return {};
+
+    if (scene.id === "catch") {
+      const decision = intent.intent === "confirm" ? "confirm" : "decline";
+      if (ctx.replay) {
+        patchFlow({ catch: { decision, via } });
+        return {};
+      }
+      // Skip never approves and leaves the move waiting in Needs your OK.
+      if (ctx.skipped) {
+        patchFlow({ catch: { decision: "decline", via, skipped: true } });
+        return {};
+      }
+      const res = await answer.catch(id, decision, via);
+      if (res?.standup) patchFlow({ standup: res.standup });
+      const m = b?.mismatch;
+      if (decision === "confirm" && res?.ok) {
+        patchFlow({ catch: { decision, via, undoUntil: res.undoUntil } });
+        refreshSandbox();
+        return m ? { speech: `Done. ${m.ticket.key} moves to ${m.suggestedStatus}.`, highlights: [m.ticket.key, m.suggestedStatus] } : {};
+      }
+      patchFlow({ catch: { decision: "decline", via } });
+      return m ? { speech: `Okay, ${m.ticket.key} stays ${m.ticket.status}. I've noted it in your standup.`, highlights: [m.ticket.key] } : {};
+    }
     return {};
   };
 
   const finish = useCallback(async () => {
     replayRef.current = false;
     await refresh();
+    setOverrides(null);
     setFrozen(null);
     setMode("settled");
   }, [refresh, setMode]);
@@ -214,6 +245,7 @@ export function StartDay() {
     markBriefed();
     startedAt.current = Date.now();
     replayRef.current = false;
+    setOverrides(initialOverrides(viewRef.current?.answers, false));
     const ready = viewRef.current?.sceneScript;
     if (ready) {
       setFrozen(ready);
@@ -235,6 +267,7 @@ export function StartDay() {
   /* ------------------------------- render ------------------------------- */
 
   const b = view?.briefing ?? null;
+  const day = resolve(b, view?.answers, mode === "settled" ? null : overrides);
   const current = mode === "briefing" ? engine.current : null;
   const sceneRank = rank(current?.id);
   const owl = owlStateFor(engine.status);
@@ -307,6 +340,20 @@ export function StartDay() {
                 </motion.div>
               )}
             </header>
+
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_17rem]">
+              <div className="min-w-0 space-y-5">
+                {briefing && b?.mismatch && sceneRank < rank("wrapup") && (
+                  <CatchCard
+                    mismatch={b.mismatch}
+                    state={day.catch}
+                    undone={undone.includes(b.mismatch.pendingActionId)}
+                    active={current?.id === "catch"}
+                    onUndone={() => markUndone(b.mismatch!.pendingActionId)}
+                  />
+                )}
+              </div>
+            </div>
           </div>
         )}
         {mode === "briefing" && <ControlBar engine={engine} />}
