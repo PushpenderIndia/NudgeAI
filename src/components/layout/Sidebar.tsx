@@ -7,6 +7,7 @@ import { NAV_ITEMS } from "@/lib/nav";
 import { NudgeLogo } from "@/components/NudgeLogo";
 import { ConnectionDots } from "@/components/layout/ConnectionDots";
 import { Bell } from "@/components/notifications/Bell";
+import { DemoPill } from "@/components/demo/DemoPill";
 import { cn } from "@/lib/utils";
 import { signOutDemo } from "@/lib/auth";
 
@@ -27,6 +28,7 @@ export function Sidebar() {
         </Link>
         <Bell />
       </div>
+      <DemoPill className="mt-4 px-2" />
 
       <nav className="mt-7 flex flex-1 flex-col gap-1">
         {NAV_ITEMS.map((item) => {

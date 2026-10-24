@@ -7,6 +7,7 @@ import { Menu, X } from "lucide-react";
 import { NAV_ITEMS } from "@/lib/nav";
 import { NudgeLogo } from "@/components/NudgeLogo";
 import { Bell } from "@/components/notifications/Bell";
+import { DemoPill } from "@/components/demo/DemoPill";
 import { cn } from "@/lib/utils";
 
 export function MobileNav() {
@@ -19,6 +20,7 @@ export function MobileNav() {
           <NudgeLogo variant="full" size={28} />
         </Link>
         <div className="flex items-center gap-2">
+          <DemoPill />
           <Bell />
           <button onClick={() => setOpen((o) => !o)} aria-label="Menu" className="text-fg">
             {open ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}

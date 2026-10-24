@@ -2,21 +2,40 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, LockKeyhole } from "lucide-react";
+import { ArrowRight, LockKeyhole, Play } from "lucide-react";
 import { NudgeLogo, OwlMark } from "@/components/NudgeLogo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DEMO_EMAIL, DEMO_PASSWORD, isDemoAuthenticated, signInDemo } from "@/lib/auth";
+import { hasDemoMarker } from "@/lib/demo-cookies";
+import { startDemo } from "@/lib/demo-client";
+
+// Warm the briefing so it is usually ready by the time the user clicks Start.
+const prefetchBriefing = () => void fetch("/api/briefing/start", { method: "POST" }).catch(() => {});
 
 export function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [starting, setStarting] = useState(false);
 
   useEffect(() => {
-    if (isDemoAuthenticated()) router.replace("/today");
+    if (hasDemoMarker()) prefetchBriefing();
+    if (isDemoAuthenticated() || hasDemoMarker()) router.replace("/today");
   }, [router]);
+
+  async function handleTryDemo() {
+    setStarting(true);
+    setError(null);
+    if (!(await startDemo())) {
+      setStarting(false);
+      setError("The demo could not start. Please try again.");
+      return;
+    }
+    prefetchBriefing();
+    router.replace("/today");
+  }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -41,7 +60,17 @@ export function LoginPage() {
               <OwlMark size={48} />
             </div>
             <h1 className="text-2xl font-bold tracking-tight">Welcome back</h1>
-            <p className="mt-2 text-sm text-muted">Sign in to open your gently handled workspace.</p>
+            <p className="mt-2 text-sm text-muted">See how Nudge plans a developer&apos;s day, no account needed.</p>
+          </div>
+
+          <Button type="button" size="lg" className="w-full" onClick={handleTryDemo} disabled={starting}>
+            <Play className="h-4 w-4" /> {starting ? "Opening the demo…" : "Try the demo"}
+          </Button>
+
+          <div className="my-6 flex items-center gap-3 text-xs text-muted">
+            <span className="h-px flex-1 bg-border" />
+            or sign in
+            <span className="h-px flex-1 bg-border" />
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -74,7 +103,7 @@ export function LoginPage() {
               />
             </div>
             {error && <p className="text-sm text-danger">{error}</p>}
-            <Button type="submit" size="lg" className="w-full">
+            <Button type="submit" variant="secondary" size="lg" className="w-full">
               Sign in <ArrowRight className="h-4 w-4" />
             </Button>
           </form>
