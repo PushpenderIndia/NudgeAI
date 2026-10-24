@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { LayoutGroup, MotionConfig, motion } from "framer-motion";
 import { isFinished, type RunView } from "@/lib/agent-runs";
-import type { StandupDraft } from "@/nudge/briefing";
+import { STANDUP_CHANNEL, type StandupDraft } from "@/nudge/briefing";
+import { SANDBOX_REFRESH_EVENT } from "@/lib/demo-client";
 import { SCENE_IDS, type Intent, type Scene, type SceneScript } from "@/nudge/scenes";
 import { lastBriefed, markBriefed, shouldAutoBrief, useVoicePrefs } from "@/nudge/voice/prefs";
 import { Caption } from "@/components/briefing/Caption";
@@ -13,7 +14,8 @@ import { OwlAvatar, owlStateFor } from "@/components/briefing/OwlAvatar";
 import { StatusLine } from "@/components/briefing/StatusLine";
 import { useSceneEngine, type InteractionContext, type InteractionResult } from "@/components/briefing/engine/useSceneEngine";
 import type { Via } from "@/components/briefing/engine/intents";
-import { answer, fetchView, startBriefing, type BriefingView } from "./api";
+import { answer, fetchView, listApprovals, startBriefing, type BriefingView, type PendingApproval } from "./api";
+import { NeedsYourOk } from "./NeedsYourOk";
 import { CatchCard } from "./CatchCard";
 import { initialOverrides, resolve, type FlowOverrides } from "./flow";
 import { TeamStage, WelcomeStage, firstName, greeting, runStatus, type Line } from "./Stage";
@@ -61,6 +63,7 @@ export function StartDay() {
 
   const [overrides, setOverrides] = useState<FlowOverrides | null>(null);
   const [undone, setUndone] = useState<string[]>([]);
+  const [approvals, setApprovals] = useState<PendingApproval[]>([]);
   const modeRef = useRef<Mode>("loading");
   const viewRef = useRef<BriefingView | null>(null);
   const runRef = useRef<string | null>(null);
@@ -75,6 +78,17 @@ export function StartDay() {
 
   const patchFlow = useCallback((p: FlowOverrides) => setOverrides((o) => ({ ...(o ?? {}), ...p })), []);
   const markUndone = useCallback((actionId: string) => setUndone((u) => [...u, actionId]), []);
+
+  const refreshApprovals = useCallback(async () => setApprovals(await listApprovals()), []);
+  useEffect(() => {
+    const refresh = () => void refreshApprovals();
+    const timer = window.setTimeout(refresh, 0);
+    window.addEventListener(SANDBOX_REFRESH_EVENT, refresh);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener(SANDBOX_REFRESH_EVENT, refresh);
+    };
+  }, [refreshApprovals]);
 
   // Redraft diff: struck-through and highlighted lines for ~1.5 s, then the clean version.
   const diffTimer = useRef<number | undefined>(undefined);
@@ -247,6 +261,23 @@ export function StartDay() {
       if (!ctx.replay) await answer.done(id);
       return {};
     }
+
+    if (scene.id === "post") {
+      const decision = intent.intent === "confirm" ? "confirm" : "decline";
+      if (ctx.replay) {
+        patchFlow({ post: { decision, via } });
+        return {};
+      }
+      const res = await answer.post(id, decision, via);
+      if (decision === "confirm" && res?.ok) {
+        patchFlow({ post: { decision, via, undoUntil: res.undoUntil, at: new Date().toISOString() } });
+        refreshSandbox();
+        return { speech: `Posted to ${STANDUP_CHANNEL.replace("#", "")}.`, highlights: [STANDUP_CHANNEL.replace("#", "")] };
+      }
+      patchFlow({ post: { decision: "decline", via, skipped: ctx.skipped } });
+      void refreshApprovals();
+      return { speech: decision === "confirm" ? "I couldn't post it just now. The draft is on the page." : "Okay, I'll keep the draft here for you." };
+    }
     return {};
   };
 
@@ -265,6 +296,9 @@ export function StartDay() {
     replay: view?.answers ?? null,
     handlers: {
       onInteraction,
+      onSceneStart: (scene) => {
+        if (scene.id === "inbox" || scene.id === "wrapup") void refreshApprovals();
+      },
       onSceneEnd: (scene) => {
         if (scene.id !== "team" || replayRef.current) return;
         const elapsed = Date.now() - startedAt.current;
@@ -390,6 +424,9 @@ export function StartDay() {
     void answer.pick(runId, choiceId, "click").then(() => refresh());
   };
 
+  const runActionIds = new Set([b?.mismatch?.pendingActionId, b?.standupActionId, b?.inbox?.pendingActionId].filter(Boolean));
+  const traceFor = (actionId: string) => (runId && runActionIds.has(actionId) ? runId : null);
+
   const saveEditor = async (s: StandupDraft) => {
     if (!runId) return;
     const res = await answer.replace(runId, s);
@@ -481,6 +518,15 @@ export function StartDay() {
                     postedAt={day.post?.at ?? postedAt(view?.run)}
                     actionId={b.standupActionId}
                     onPostUndone={() => b.standupActionId && markUndone(b.standupActionId)}
+                  />
+                )}
+                {reached("inbox") && (
+                  <NeedsYourOk
+                    items={approvals}
+                    highlightId={b?.inbox?.pendingActionId}
+                    active={current?.id === "inbox"}
+                    traceFor={traceFor}
+                    onChanged={refreshApprovals}
                   />
                 )}
               </div>
