@@ -4,7 +4,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { LayoutGroup, MotionConfig, motion } from "framer-motion";
 import { isFinished, type RunView } from "@/lib/agent-runs";
 import { STANDUP_CHANNEL, type StandupDraft } from "@/nudge/briefing";
-import { SANDBOX_REFRESH_EVENT } from "@/lib/demo-client";
+import { SANDBOX_REFRESH_EVENT, useDemoMode } from "@/lib/demo-client";
+import { RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { SandboxDrawer } from "@/components/demo/SandboxDrawer";
 import { SCENE_IDS, type Intent, type Scene, type SceneScript } from "@/nudge/scenes";
 import { lastBriefed, markBriefed, shouldAutoBrief, useVoicePrefs } from "@/nudge/voice/prefs";
 import { Caption } from "@/components/briefing/Caption";
@@ -15,7 +18,7 @@ import { StatusLine } from "@/components/briefing/StatusLine";
 import { useSceneEngine, type InteractionContext, type InteractionResult } from "@/components/briefing/engine/useSceneEngine";
 import type { Via } from "@/components/briefing/engine/intents";
 import { AgentGraphPanel } from "@/components/graph/AgentGraphPanel";
-import { answer, fetchView, listApprovals, startBriefing, startPrep, type BriefingView, type PendingApproval } from "./api";
+import { answer, fetchView, listApprovals, startBriefing, startPrep, startWeekly, type BriefingView, type PendingApproval } from "./api";
 import { HowIPlanned } from "./HowIPlanned";
 import { Meetings } from "./Meetings";
 import { NeedsYourOk } from "./NeedsYourOk";
@@ -26,7 +29,8 @@ import { PickedPlan } from "./PickedPlan";
 import { StandupCard } from "./StandupCard";
 import { diffLines, editSummary, linesToStandup } from "./standup";
 import { TodoRail } from "./TodoRail";
-import { REVEAL, hhmm, refreshSandbox } from "./ui";
+import { SideRunResult } from "./SideRunResult";
+import { REVEAL, Section, hhmm, refreshSandbox } from "./ui";
 
 type Mode = "loading" | "intro" | "pending" | "briefing" | "settled";
 
@@ -68,6 +72,8 @@ export function StartDay() {
   const [undone, setUndone] = useState<string[]>([]);
   const [approvals, setApprovals] = useState<PendingApproval[]>([]);
   const [panelRun, setPanelRun] = useState<string | null>(null);
+  const [weeklyRun, setWeeklyRun] = useState<string | null>(null);
+  const demo = useDemoMode();
   const [prepRuns, setPrepRuns] = useState<Record<string, string>>({});
   const modeRef = useRef<Mode>("loading");
   const viewRef = useRef<BriefingView | null>(null);
@@ -357,6 +363,30 @@ export function StartDay() {
     }
   }, [engine, setMode]);
 
+  /** Re-speaks the saved script with the saved answers: no model calls, no answer routes. */
+  const replay = useCallback(() => {
+    const v = viewRef.current;
+    if (!v?.sceneScript) return;
+    replayRef.current = true;
+    setPanelRun(null);
+    setOverrides(initialOverrides(v.answers, true));
+    setFrozen(v.sceneScript);
+    setMode("briefing");
+    engine.replay(v.answers);
+  }, [engine, setMode]);
+
+  /** A fresh plan_day run, then the flow again from Scene 1. */
+  const planAgain = useCallback(async () => {
+    startedAt.current = Date.now();
+    replayRef.current = false;
+    queuedStart.current = false;
+    setPanelRun(null);
+    setOverrides(initialOverrides(undefined, false));
+    setFrozen(null);
+    setMode("pending");
+    if (!(await openRun(true))) setMode("settled");
+  }, [openRun, setMode]);
+
   const skipIntro = useCallback(() => {
     markBriefed();
     queuedStart.current = false;
@@ -433,6 +463,13 @@ export function StartDay() {
   const runActionIds = new Set([b?.mismatch?.pendingActionId, b?.standupActionId, b?.inbox?.pendingActionId].filter(Boolean));
   const traceFor = (actionId: string) => (runId && runActionIds.has(actionId) ? runId : null);
 
+  const weekly = async () => {
+    const started = await startWeekly();
+    if (!started) return;
+    setWeeklyRun(started.runId);
+    setPanelRun(started.runId);
+  };
+
   const prep = async (eventId: string) => {
     const started = await startPrep(eventId);
     if (!started) return;
@@ -483,6 +520,7 @@ export function StartDay() {
                   )}
                   <div className="min-h-4">{status && <StatusLine agent={status.agent} text={status.text} />}</div>
                   {briefing && audioHint}
+                  {settled && view && !b && isFinished(view.run) && <p className="text-xs text-muted">I couldn&apos;t put your briefing together this time. Try Plan my day again.</p>}
                   {startError && <p className="text-xs text-muted">I couldn&apos;t start planning your day. Try again in a moment.</p>}
                 </div>
               </div>
@@ -493,7 +531,7 @@ export function StartDay() {
               )}
               {(settled || wrapping) && view?.run && (
                 <div className="mt-5">
-                  <HowIPlanned run={view.run} active={wrapping} onViewTrace={() => setPanelRun(view.run.id)} />
+                  <HowIPlanned run={view.run} active={wrapping} onViewTrace={() => setPanelRun(view.run.id)} onReplay={settled && view.sceneScript ? replay : undefined} />
                 </div>
               )}
             </header>
@@ -549,7 +587,24 @@ export function StartDay() {
                 )}
                 {reached("wrapup") && b && <Meetings events={b.events} prepRuns={prepRuns} onPrep={(eventId) => void prep(eventId)} onOpenRun={setPanelRun} />}
               </div>
-              <aside className="min-w-0 space-y-5">{reached("picks") && b && <TodoRail tickets={rail} />}</aside>
+              <aside className="min-w-0 space-y-5">
+                {reached("picks") && b && <TodoRail tickets={rail} />}
+                {settled && (
+                  <Section title="Your day">
+                    <div className="flex flex-col items-stretch gap-2">
+                      <Button size="sm" variant="secondary" onClick={() => void weekly()}>
+                        Draft weekly update
+                      </Button>
+                      {weeklyRun && <SideRunResult runId={weeklyRun} onOpen={() => setPanelRun(weeklyRun)} />}
+                      <Button size="sm" variant="ghost" onClick={() => void planAgain()}>
+                        <RefreshCw className="h-3.5 w-3.5" />
+                        Plan my day again
+                      </Button>
+                    </div>
+                  </Section>
+                )}
+                {demo && <SandboxDrawer />}
+              </aside>
             </div>
           </div>
         )}
