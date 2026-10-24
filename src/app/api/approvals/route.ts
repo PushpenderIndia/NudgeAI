@@ -1,14 +1,21 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { pendingActions, drafts } from "@/db/schema";
+import { flushDueApprovals } from "@/ai/approvals";
+import { getRequestContext } from "@/nudge/session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** Lists everything awaiting the user's OK, with the draft content if any. */
+/** Lists everything awaiting the user's OK in this (live or demo) session, with the draft content if any. */
 export async function GET() {
-  const rows = await db.select().from(pendingActions).where(eq(pendingActions.status, "pending"));
+  await flushDueApprovals();
+  const { sessionKey } = await getRequestContext();
+  const rows = await db
+    .select()
+    .from(pendingActions)
+    .where(and(eq(pendingActions.status, "pending"), eq(pendingActions.sessionKey, sessionKey)));
 
   const enriched = await Promise.all(
     rows.map(async (a) => {
