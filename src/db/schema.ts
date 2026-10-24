@@ -79,6 +79,7 @@ export const tasks = sqliteTable("tasks", {
   source: text("source").$type<TaskSource>().notNull().default("manual"),
   sourceId: text("source_id"),
   runId: text("run_id"),
+  agent: text("agent"),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: createdAt(),
 });
@@ -131,6 +132,7 @@ export const pendingActions = sqliteTable("pending_actions", {
   status: text("status").$type<ActionStatus>().notNull().default("pending"),
   draftId: text("draft_id"),
   runId: text("run_id"),
+  reason: text("reason"),
   createdAt: createdAt(),
   executedAt: integer("executed_at", { mode: "timestamp_ms" }),
 });
@@ -212,13 +214,19 @@ export const reminders = sqliteTable("reminders", {
 /* ------------------------------------------------------------------ */
 export type AgentRunStatus = "running" | "waiting_for_user" | "done" | "failed";
 export type AgentStepStatus = "running" | "done" | "failed";
+export type AgentRunType = "plan_day" | "urgent_email" | "meeting_ended";
+export type FoundItemKind = "meeting" | "action_item" | "decision" | "email" | "jira" | "commit" | "pr" | "task" | "draft" | "memory";
+/** Something an agent found or produced during a step, shown as a small row. */
+export type FoundItem = { kind: FoundItemKind; label: string; detail?: string; href?: string; urgent?: boolean };
 export type MeetingPrepStatus = "queued" | "working" | "ready";
 
 export const agentRuns = sqliteTable("agent_runs", {
   id: id(),
+  // Run type: plan_day | urgent_email | meeting_ended (older runs use other trigger names).
   trigger: text("trigger").notNull(),
   title: text("title").notNull(),
   status: text("status").$type<AgentRunStatus>().notNull().default("running"),
+  summary: text("summary"),
   startedAt: createdAt(),
   finishedAt: integer("finished_at", { mode: "timestamp_ms" }),
 });
@@ -237,6 +245,23 @@ export const agentSteps = sqliteTable("agent_steps", {
   startedAt: createdAt(),
   finishedAt: integer("finished_at", { mode: "timestamp_ms" }),
   handoffTo: text("handoff_to"),
+  // Narrated steps (Today page): action doubles as the phase label, e.g. "Fetching context".
+  modelTier: text("model_tier").$type<"fast" | "heavy" | "none">().notNull().default("fast"),
+  narration: text("narration").notNull().default(""),
+  foundItems: text("found_items", { mode: "json" }).$type<FoundItem[]>().notNull().default([]),
+  handoffSummary: text("handoff_summary"),
+});
+
+/** Key takeaways written at the end of a plan_day run. */
+export const insights = sqliteTable("insights", {
+  id: id(),
+  runId: text("run_id").notNull(),
+  text: text("text").notNull(),
+  sourceType: text("source_type").$type<FoundItemKind>(),
+  sourceLabel: text("source_label"),
+  href: text("href"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: createdAt(),
 });
 
 export const meetingPrep = sqliteTable("meeting_prep", {
@@ -270,3 +295,4 @@ export type Reminder = typeof reminders.$inferSelect;
 export type AgentRun = typeof agentRuns.$inferSelect;
 export type AgentStep = typeof agentSteps.$inferSelect;
 export type MeetingPrep = typeof meetingPrep.$inferSelect;
+export type Insight = typeof insights.$inferSelect;

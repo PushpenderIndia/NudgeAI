@@ -23,6 +23,8 @@ export async function queueAction(input: {
   summary: string;
   payload: Record<string, unknown>;
   draftId?: string;
+  runId?: string;
+  reason?: string;
 }): Promise<PendingAction> {
   const [row] = await db
     .insert(pendingActions)
@@ -31,6 +33,8 @@ export async function queueAction(input: {
       summary: input.summary,
       payload: input.payload,
       draftId: input.draftId,
+      runId: input.runId,
+      reason: input.reason,
       status: "pending",
     })
     .returning();

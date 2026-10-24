@@ -26,11 +26,16 @@ npm run dev
   changes tickets without your OK."*
 - Click **Try with demo data**.
 
-### 2 · Today — the day at a glance (0:15–0:35)
-- Click **Write my morning brief** → the owl thinks → an AI brief appears.
-- Point to the amber **"Nudge says…"** callout (top priority) and the **Approvals Needed**
-  counter.
-- Note the **"What Nudge did today"** activity feed — this fills as Nudge works.
+### 2 · Today — watch Nudge plan the day (0:15–0:35)
+- Run `npm run seed` first so the first open of Today plans the day live.
+- The owl says **"Let me plan your day for you."** and the subtitle names the agent at work
+  (Historian → Courier → Tracker → Planner → Nudge). Each step narrates what it found, with
+  handoffs between agents; **Show details** reveals tool, model tier, duration and items.
+- When it finishes, the stream collapses into **How I planned this** (Replay re-plays the
+  stored steps, with no new model calls). Below it: **Today's insights**, **Needs your OK**,
+  and the **To-do tasks** rail.
+- **Simulate… → An urgent email arrives**: the banner shows Courier working; **Watch** opens
+  the live stream in a drawer, and a new approval card and urgent task appear when it's done.
 
 ### 3 · Inbox — the hero flow (0:35–1:35) ⭐
 - Go to **Inbox**, click **Triage inbox** → emails sort into Urgent / Needs reply / FYI,
@@ -39,7 +44,7 @@ npm run dev
 - Click **Draft a reply** (tone: friendly) → a drafted reply appears in your voice.
 - (Optional) **Edit** a line to show Nudge *learns your style*.
 - Click **Approve & Send** → success toast, email marked sent.
-- Jump to **Today → Activity feed**: the drafted reply + created task are logged.
+- Back on **Today**: the drafted reply and the created task are there.
   *Nothing happened without approval.*
 
 ### 4 · Meetings → minutes (1:35–2:05)

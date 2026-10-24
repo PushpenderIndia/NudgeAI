@@ -1,16 +1,11 @@
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import {
-  agentRuns,
-  agentSteps,
-  emails,
-  meetingPrep,
-  meetings,
-  pendingActions,
-  tasks,
-} from "@/db/schema";
+import { agentRuns, agentSteps, meetingPrep, meetings } from "@/db/schema";
 import { logActivity } from "@/lib/activity";
 import { completeText, hasApiKey, resolveModel } from "@/ai/client";
+import { startPlanDay } from "@/ai/agents/plan-day";
+import { startUrgentEmail } from "@/ai/agents/urgent-email";
+import { startMeetingEnded } from "@/ai/agents/meeting-ended";
 
 export const AGENTS = [
   { name: "Scribe", role: "Meeting notes and actions", tool: "meetings" },
@@ -21,11 +16,11 @@ export const AGENTS = [
   { name: "Reporter", role: "Weekly reporting", tool: "activity" },
 ] as const;
 
-type Workflow = "urgent_email" | "meeting_ended" | "start_day";
+// Narrated workflows (plan_day, urgent_email, meeting_ended) live in ./agents;
+// start_day only prepares meeting briefs for the Meetings page.
+type Workflow = "start_day";
 const WORKFLOW_TITLES: Record<Workflow, string> = {
-  urgent_email: "Urgent email: triage and draft a reply",
-  meeting_ended: "Meeting ended: write minutes and plan actions",
-  start_day: "Start my day: prepare the agenda",
+  start_day: "Prepare today's meeting briefs",
 };
 
 function modelLabel(tier: "fast" | "heavy") {
@@ -142,63 +137,13 @@ async function prepareMeeting(runId: string, meeting: typeof meetings.$inferSele
 export async function runWorkflow(workflow: Workflow, existingRunId?: string) {
   const runId = existingRunId ?? await createRun(workflow, WORKFLOW_TITLES[workflow]);
   try {
-    if (workflow === "urgent_email") {
-      const email = await db.select().from(emails).where(and(eq(emails.isSent, false), isNull(emails.triage))).orderBy(asc(emails.receivedAt)).get()
-        ?? await db.select().from(emails).where(eq(emails.isSent, false)).orderBy(asc(emails.receivedAt)).get();
-      if (!email) throw new Error("No demo email is available for this workflow.");
-      await step(runId, 1, { agent: "Courier", action: "Triage urgent email", tool: "emails", tier: "fast", inputSummary: email.subject, outputSummary: "Marked urgent because it needs a same-day response.", handoffTo: "Historian" });
-      await step(runId, 2, { agent: "Historian", action: "Retrieve related context", tool: "meetings, memory, emails", tier: "fast", inputSummary: "Search Atlas and Northwind history.", outputSummary: "Found last week’s Atlas decision and the sender’s preferred concise style.", handoffTo: "Courier" });
-      const reply = await modelSummary("heavy", "Write a concise, friendly email reply. Do not send it.", `Subject: ${email.subject}\nBody: ${email.body}`, "Thanks for the note. I’m reviewing the Atlas summary and will share an update today.");
-      await step(runId, 3, { agent: "Courier", action: "Draft reply", tool: "drafts", tier: "heavy", inputSummary: "Use the retrieved context and the user’s friendly tone.", outputSummary: "Reply draft prepared and held for approval.", handoffTo: "Planner" });
-      const summary = `Reply to ${email.fromName}: ${email.subject}`;
-      const existingAction = await db.select({ id: pendingActions.id }).from(pendingActions)
-        .where(and(eq(pendingActions.status, "pending"), eq(pendingActions.summary, summary))).get();
-      const action = existingAction
-        ? [existingAction]
-        : await db.insert(pendingActions).values({
-            actionType: "send_email",
-            summary,
-            payload: { to: email.fromEmail, subject: `Re: ${email.subject}`, body: reply },
-            runId,
-          }).returning({ id: pendingActions.id });
-      await step(runId, 4, { agent: "Planner", action: "Create urgent follow-up", tool: "tasks", tier: "fast", inputSummary: email.subject, outputSummary: "Urgent follow-up is ready in Today’s tasks.", handoffTo: "Nudge" });
-      await db.insert(tasks).values({ title: `Reply to ${email.subject}`, priority: "urgent", source: "email", sourceId: email.id, runId, sortOrder: 0 });
-      await logActivity({ action: "Courier prepared a reply", summary: `Waiting for your OK on ${email.subject}`, entityType: "agent_run", entityId: runId });
-      await finishRun(runId, "waiting_for_user");
-      return { runId, actionId: action[0].id };
-    }
-
-    if (workflow === "meeting_ended") {
-      const meeting = await db.select().from(meetings).orderBy(asc(meetings.startsAt)).get();
-      if (!meeting) throw new Error("No meeting is available for this workflow.");
-      await step(runId, 1, { agent: "Scribe", action: "Read transcript", tool: "meetings", tier: "fast", inputSummary: meeting.title, outputSummary: "Transcript loaded and decisions identified.", handoffTo: "Scribe" });
-      await step(runId, 2, { agent: "Scribe", action: "Write minutes", tool: "drafts", tier: "heavy", inputSummary: "Turn transcript into minutes.", outputSummary: "Minutes and action items prepared.", handoffTo: "Planner" });
-      await step(runId, 3, { agent: "Planner", action: "Add action items", tool: "tasks", tier: "fast", inputSummary: "Extracted actions from the minutes.", outputSummary: "Action items added to Today’s tasks.", handoffTo: "Nudge" });
-      await db.update(meetings).set({ hasMom: true }).where(eq(meetings.id, meeting.id));
-      await db.insert(tasks).values({ title: "Review meeting action items", priority: "today", source: "meeting", sourceId: meeting.id, runId, sortOrder: 0 });
-      await logActivity({ action: "Scribe wrote meeting notes", summary: `Planner added actions from ${meeting.title}`, entityType: "agent_run", entityId: runId });
-      await finishRun(runId, "done");
-      return { runId };
-    }
     const upcoming = await db.select().from(meetings).orderBy(asc(meetings.startsAt)).limit(3);
     let seq = 1;
     for (const meeting of upcoming) {
       await prepareMeeting(runId, meeting, seq);
       seq += 2;
     }
-    const existingPending = await db.select({ id: pendingActions.id }).from(pendingActions).where(eq(pendingActions.status, "pending")).limit(1);
-    if (existingPending.length === 0) {
-      const email = await db.select().from(emails).where(eq(emails.isSent, false)).orderBy(asc(emails.receivedAt)).get();
-      if (email) {
-        await db.insert(pendingActions).values({
-          actionType: "send_email",
-          summary: `Reply to ${email.fromName}: ${email.subject}`,
-          payload: { to: email.fromEmail, subject: `Re: ${email.subject}`, body: "Thanks for the note. I’m reviewing the Atlas summary and will share an update today." },
-          runId,
-        });
-      }
-    }
-    await logActivity({ action: "Nudge prepared your day", summary: `${upcoming.length} meeting briefs are ready`, entityType: "agent_run", entityId: runId });
+    await logActivity({ action: "Nudge prepared meeting briefs", summary: `${upcoming.length} meeting briefs are ready`, entityType: "agent_run", entityId: runId });
     await finishRun(runId, "done");
     return { runId };
   } catch (error) {
@@ -207,7 +152,10 @@ export async function runWorkflow(workflow: Workflow, existingRunId?: string) {
   }
 }
 
-export async function startWorkflow(workflow: Workflow) {
+export async function startWorkflow(workflow: Workflow | "plan_day" | "urgent_email" | "meeting_ended"): Promise<{ runId: string }> {
+  if (workflow === "plan_day") return startPlanDay();
+  if (workflow === "urgent_email") return startUrgentEmail();
+  if (workflow === "meeting_ended") return startMeetingEnded();
   const runId = await createRun(workflow, WORKFLOW_TITLES[workflow]);
   void runWorkflow(workflow, runId).catch((error) => {
     console.error(`Agent workflow failed: ${workflow}`, error);

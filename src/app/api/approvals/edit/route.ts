@@ -20,6 +20,8 @@ export async function POST(req: Request) {
   const payload = { ...action.payload } as Record<string, unknown>;
   if (subject !== undefined) payload.subject = subject;
   if (body !== undefined) payload.body = body;
+  // Jira comments carry their text as `comment`; keep it in step with the edited body.
+  if (body !== undefined && "comment" in payload) payload.comment = body;
   await db.update(pendingActions).set({ payload }).where(eq(pendingActions.id, id));
 
   if (action.draftId) {

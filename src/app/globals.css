@@ -104,6 +104,34 @@ body {
   animation: fade-up 0.18s ease both;
 }
 
+/* Owl blink while an agent works: eyes close briefly every few seconds. */
+@keyframes owl-blink {
+  0%, 92%, 100% { transform: scaleY(1); }
+  95% { transform: scaleY(0.1); }
+}
+.owl-blink {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: owl-blink 4.8s ease-in-out infinite;
+}
+
+/* Gentle pulse for the agent that is working right now. */
+@keyframes agent-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+.animate-agent-pulse {
+  animation: agent-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-fade-in {
+  animation: fade-in 0.22s ease both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.001ms !important;

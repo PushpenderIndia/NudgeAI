@@ -1,107 +1,120 @@
-import { and, asc, desc, eq, gte, lt } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { activityLog, agentRuns, agentSteps, emails, meetingPrep, meetings, pendingActions, reminders, tasks } from "@/db/schema";
+import { agentRuns, agentSteps, drafts, insights, meetingPrep, meetings, pendingActions, tasks } from "@/db/schema";
 import { getSettings } from "@/lib/settings";
 import { formatTime } from "@/lib/utils";
+import { toRunView } from "@/lib/agent-runs";
 import { ensureDayStarted } from "@/ai/agent-orchestrator";
-import { TodayDashboard } from "@/components/today/TodayDashboard";
+import { startPlanDay } from "@/ai/agents/plan-day";
+import { dayBounds } from "@/ai/agents/context";
+import { TodayExperience } from "@/components/today/TodayExperience";
 
 export const dynamic = "force-dynamic";
 
-export default async function TodayPage() {
-  await ensureDayStarted();
-  const settings = await getSettings();
-  const dayStart = new Date();
-  dayStart.setHours(0, 0, 0, 0);
-  const yesterdayStart = new Date(dayStart);
-  yesterdayStart.setDate(yesterdayStart.getDate() - 1);
-  const rows = (await db.select().from(meetings).orderBy(asc(meetings.startsAt)))
-    .filter((meeting) => meeting.endsAt >= dayStart);
-  const prepRows = await db.select().from(meetingPrep);
-  const todoRows = await db.select().from(tasks).where(eq(tasks.status, "todo")).orderBy(asc(tasks.sortOrder));
-  const pendingRows = await db.select().from(pendingActions).where(eq(pendingActions.status, "pending"));
-  const replyRows = await db
-    .select()
-    .from(emails)
-    .where(eq(emails.isSent, false))
-    .orderBy(desc(emails.receivedAt))
-    .limit(12);
-  const reminderRows = await db.select().from(reminders).where(eq(reminders.enabled, true));
-  const yesterdayRows = await db
-    .select()
-    .from(activityLog)
-    .where(and(gte(activityLog.createdAt, yesterdayStart), lt(activityLog.createdAt, dayStart)))
-    .orderBy(desc(activityLog.createdAt))
-    .limit(4);
-  const runs = await db.select().from(agentRuns).orderBy(desc(agentRuns.startedAt)).limit(12);
-  const steps = await db.select().from(agentSteps).orderBy(desc(agentSteps.startedAt)).limit(80);
+const NARRATED = ["plan_day", "urgent_email", "meeting_ended"];
 
-  const prepByMeeting = new Map(prepRows.map((prep) => [prep.meetingId, prep]));
-  const pending = pendingRows.map((action) => ({
-    id: action.id,
-    title: action.summary,
-    why: action.actionType === "send_email" ? "Courier used recent Atlas context to prepare this reply." : "This action is ready for your review.",
-    preview: typeof action.payload.body === "string" ? action.payload.body : action.summary,
-  }));
+export default async function TodayPage() {
+  const settings = await getSettings();
+  const { dayStart, dayEnd } = dayBounds();
+
+  // Plan the day automatically on the first open each day.
+  let latestPlan = await db.select().from(agentRuns).where(eq(agentRuns.trigger, "plan_day")).orderBy(desc(agentRuns.startedAt)).get();
+  if (!latestPlan || !latestPlan.startedAt || latestPlan.startedAt < dayStart) {
+    const { runId } = await startPlanDay();
+    latestPlan = await db.select().from(agentRuns).where(eq(agentRuns.id, runId)).get();
+  }
+  // Meeting briefs for the Meetings page (kept from the earlier start-of-day flow).
+  void ensureDayStarted().catch((error) => console.error("Meeting briefs failed", error));
+
+  const planSteps = latestPlan ? await db.select().from(agentSteps).where(eq(agentSteps.runId, latestPlan.id)).orderBy(asc(agentSteps.seq)) : [];
+  const sideRun = await db.select().from(agentRuns)
+    .where(and(inArray(agentRuns.trigger, NARRATED.filter((t) => t !== "plan_day")), eq(agentRuns.status, "running")))
+    .orderBy(desc(agentRuns.startedAt)).get();
+
+  // Insights come from the latest plan that produced some.
+  const insightRows = latestPlan ? await db.select().from(insights).where(eq(insights.runId, latestPlan.id)).orderBy(asc(insights.sortOrder)) : [];
+
+  const pendingRows = await db.select().from(pendingActions).where(eq(pendingActions.status, "pending")).orderBy(desc(pendingActions.createdAt));
+  const draftIds = pendingRows.map((a) => a.draftId).filter((id): id is string => Boolean(id));
+  const draftRows = draftIds.length ? await db.select().from(drafts).where(inArray(drafts.id, draftIds)) : [];
+  const traceRunIds = [...new Set(pendingRows.map((a) => a.runId).filter((id): id is string => Boolean(id)))];
+  const traceRuns = traceRunIds.length ? await db.select().from(agentRuns).where(inArray(agentRuns.id, traceRunIds)) : [];
+  const traceSteps = traceRunIds.length ? await db.select().from(agentSteps).where(inArray(agentSteps.runId, traceRunIds)).orderBy(asc(agentSteps.seq)) : [];
+
+  const todoRows = await db.select().from(tasks).where(eq(tasks.status, "todo")).orderBy(asc(tasks.sortOrder));
+  const meetingRows = (await db.select().from(meetings).orderBy(asc(meetings.startsAt))).filter((m) => m.startsAt >= dayStart && m.startsAt < dayEnd);
+  const prepRows = await db.select().from(meetingPrep);
 
   return (
-    <TodayDashboard
+    <TodayExperience
       userName={settings.userName}
-      dateLabel={new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric" }).format(new Date())}
+      dateLabel={new Intl.DateTimeFormat("en-AU", { weekday: "long", day: "numeric", month: "long" }).format(new Date())}
       demoMode={settings.mode === "demo"}
-      meetings={rows.map((meeting) => ({
-        id: meeting.id,
-        title: meeting.title,
-        time: `${formatTime(meeting.startsAt)} – ${formatTime(meeting.endsAt)}`,
-        startsAt: meeting.startsAt.toISOString(),
-        attendees: meeting.attendees,
-        past: meeting.endsAt < new Date(),
-        hasMom: meeting.hasMom,
-        prep: prepByMeeting.get(meeting.id) ?? null,
-      }))}
-      tasks={todoRows.slice(0, 8).map((task) => ({
-        id: task.id,
-        title: task.title,
-        source: task.source,
-        createdBy: task.source === "email" ? "Courier" : task.source === "meeting" ? "Planner" : "You",
-      }))}
-      replies={replyRows.filter((email) => email.triage !== "fyi").slice(0, 4).map((email) => ({
-        id: email.id,
-        sender: email.fromName,
-        subject: email.subject,
-        preview: email.body.replace(/\s+/g, " ").slice(0, 120),
-        receivedAt: email.receivedAt.toISOString(),
-      }))}
-      reminders={reminderRows.map((reminder) => ({
-        id: reminder.id,
-        kind: reminder.kind,
-        schedule: reminder.schedule,
-        message: reminder.message,
-      }))}
-      yesterdayInsights={yesterdayRows.map((entry) => ({
-        id: entry.id,
-        summary: entry.summary,
-        action: entry.action,
-      }))}
-      pending={pending}
-      runs={runs.map((run) => ({
-        id: run.id,
-        title: run.title,
-        status: run.status,
-        startedAt: run.startedAt?.toISOString() ?? "",
-        steps: steps.filter((step) => step.runId === run.id).map((step) => ({
-          agent: step.agent,
-          action: step.action,
-          tool: step.tool,
-          model: step.model,
-          inputSummary: step.inputSummary,
-          outputSummary: step.outputSummary,
-          status: step.status,
-          handoffTo: step.handoffTo,
-          startedAt: step.startedAt?.toISOString(),
-          finishedAt: step.finishedAt?.toISOString() ?? null,
-        })),
-      }))}
+      planRun={latestPlan ? toRunView(latestPlan, planSteps) : null}
+      sideRun={sideRun ? toRunView(sideRun, []) : null}
+      insights={insightRows.map((i) => ({ id: i.id, text: i.text, sourceType: i.sourceType, sourceLabel: i.sourceLabel, href: i.href }))}
+      approvals={pendingRows.map((a) => {
+        const draft = draftRows.find((d) => d.id === a.draftId);
+        let content: { subject?: string; body?: string } = {};
+        try {
+          content = draft ? JSON.parse(draft.content) : {};
+        } catch {
+          content = { body: draft?.content };
+        }
+        const run = traceRuns.find((r) => r.id === a.runId);
+        const preview = String(content.body ?? a.payload.body ?? a.payload.comment ?? a.payload.title ?? a.summary);
+        return {
+          id: a.id,
+          actionType: a.actionType,
+          title: a.summary,
+          reason: a.reason ?? (a.actionType === "send_email" ? "Someone is waiting on a reply." : "Ready for your review."),
+          subject: content.subject ?? (typeof a.payload.subject === "string" ? a.payload.subject : null),
+          preview,
+          createdAt: a.createdAt?.toISOString() ?? null,
+          trace: run
+            ? {
+                id: run.id,
+                title: run.title,
+                status: run.status,
+                startedAt: run.startedAt?.toISOString(),
+                finishedAt: run.finishedAt?.toISOString() ?? null,
+                steps: traceSteps.filter((s) => s.runId === run.id).map((s) => ({
+                  id: s.id,
+                  agent: s.agent,
+                  action: s.action,
+                  tool: s.tool,
+                  model: s.model,
+                  inputSummary: s.inputSummary,
+                  outputSummary: s.narration || s.outputSummary,
+                  handoffTo: s.handoffTo,
+                  status: s.status,
+                  startedAt: s.startedAt?.toISOString(),
+                  finishedAt: s.finishedAt?.toISOString() ?? null,
+                })),
+              }
+            : null,
+        };
+      })}
+      tasks={todoRows
+        .sort((a, b) => Number(b.priority === "urgent") - Number(a.priority === "urgent") || a.sortOrder - b.sortOrder)
+        .map((t) => ({
+          id: t.id,
+          title: t.title,
+          due: t.due ? formatTime(t.due) : null,
+          urgent: t.priority === "urgent",
+          source: t.source,
+          agent: t.agent ?? (t.source === "manual" ? "You" : "Nudge"),
+        }))}
+      meetings={meetingRows.map((m) => {
+        const prep = prepRows.find((p) => p.meetingId === m.id);
+        return {
+          id: m.id,
+          title: m.title,
+          time: formatTime(m.startsAt),
+          past: m.endsAt < new Date(),
+          status: m.hasMom ? "Minutes ready" : prep?.status === "ready" ? "Prep ready" : prep?.status === "working" ? "Preparing" : null,
+        };
+      })}
     />
   );
 }

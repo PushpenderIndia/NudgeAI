@@ -21,10 +21,14 @@ interface NudgeLogoProps {
 export function OwlMark({
   size = 40,
   urgent = false,
+  blinking = false,
   className,
 }: {
   size?: number;
+  /** Tints the eyes amber, used only when something urgent was found. */
   urgent?: boolean;
+  /** Slow blink while an agent is working. */
+  blinking?: boolean;
   animated?: boolean;
   className?: string;
 }) {
@@ -76,21 +80,21 @@ export function OwlMark({
       />
 
       {/* eyes */}
-      <g className="transition-transform duration-150">
-        <circle cx="24" cy="28" r="9.5" fill="#EEF0FF" />
-        <circle cx="40" cy="28" r="9.5" fill="#EEF0FF" />
+      <g className={cn("transition-transform duration-150", blinking && "owl-blink")}>
+        <circle cx="24" cy="28" r="9.5" fill={urgent ? "#FDE68A" : "#EEF0FF"} className="transition-[fill] duration-500" />
+        <circle cx="40" cy="28" r="9.5" fill={urgent ? "#FDE68A" : "#EEF0FF"} className="transition-[fill] duration-500" />
         <circle
           cx="24"
           cy="28"
           r="4.6"
-          fill="#FBBF24"
+          fill={urgent ? "#D97706" : "#FBBF24"}
           transform={pupilTransform}
         />
         <circle
           cx="40"
           cy="28"
           r="4.6"
-          fill="#FBBF24"
+          fill={urgent ? "#D97706" : "#FBBF24"}
           transform={pupilTransform}
         />
         <circle cx="25.6" cy="26.4" r="1.4" fill="#0A0F25" opacity="0.6" transform={pupilTransform} />
