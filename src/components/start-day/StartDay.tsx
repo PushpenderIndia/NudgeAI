@@ -16,7 +16,9 @@ import { answer, fetchView, startBriefing, type BriefingView } from "./api";
 import { CatchCard } from "./CatchCard";
 import { initialOverrides, resolve, type FlowOverrides } from "./flow";
 import { TeamStage, WelcomeStage, firstName, greeting, runStatus, type Line } from "./Stage";
-import { REVEAL, refreshSandbox } from "./ui";
+import { PickedPlan } from "./PickedPlan";
+import { TodoRail } from "./TodoRail";
+import { REVEAL, hhmm, refreshSandbox } from "./ui";
 
 type Mode = "loading" | "intro" | "pending" | "briefing" | "settled";
 
@@ -186,6 +188,25 @@ export function StartDay() {
       patchFlow({ catch: { decision: "decline", via } });
       return m ? { speech: `Okay, ${m.ticket.key} stays ${m.ticket.status}. I've noted it in your standup.`, highlights: [m.ticket.key] } : {};
     }
+
+    if (scene.id === "picks") {
+      const choiceId = intent.choiceId ?? b?.picks[0]?.id;
+      if (!choiceId) return {};
+      const terms = [...(b?.picks.map((p) => p.id) ?? []), ...(b?.events.map((e) => hhmm(e.start)) ?? [])];
+      const lineFor = (speech?: string) => (speech ? { replaceNext: { speech, captionHighlights: terms.filter((t) => speech.includes(t)) } } : {});
+      if (ctx.replay) {
+        patchFlow({ pickId: choiceId });
+        return lineFor(v?.answers.planSpeech);
+      }
+      engineRef.current?.setStatusLine("Planner", `Planner is fitting ${choiceId} into your day…`);
+      const res = await answer.pick(id, choiceId, via);
+      if (!res) {
+        patchFlow({ pickId: choiceId });
+        return {};
+      }
+      patchFlow({ pickId: choiceId, plan: res.plan, todo: res.todo, standup: res.standup });
+      return lineFor(res.speech);
+    }
     return {};
   };
 
@@ -305,6 +326,29 @@ export function StartDay() {
   }
 
   const briefing = mode === "briefing" && sceneRank >= rank("catch");
+  const settled = mode === "settled";
+  const reached = (id: string) => settled || sceneRank >= rank(id);
+
+  const picks = b?.picks ?? [];
+  let revealedPicks = picks.length;
+  if (current?.id === "picks") {
+    revealedPicks = 0;
+    for (const p of picks) {
+      const words = p.ticket.title.split(/[^A-Za-z0-9']+/).filter((w) => w.length >= 5);
+      if (engine.isSpoken(p.id) || words.some((w) => engine.isSpoken(w))) revealedPicks++;
+      else break;
+    }
+  }
+  const choosing = (current?.id === "picks" && engine.interaction?.type === "choice") || (settled && !day.pickId);
+  const pickKeys = new Set(picks.map((p) => p.id));
+  const rail = day.pickId
+    ? [...new Map([...day.todo, ...picks.map((p) => p.ticket)].map((t) => [t.key, t])).values()].filter((t) => t.key !== day.pickId)
+    : day.todo.filter((t) => !pickKeys.has(t.key));
+  const choose = (choiceId: string) => {
+    if (!settled) return engine.respond({ kind: "click", optionId: choiceId });
+    if (!runId) return;
+    void answer.pick(runId, choiceId, "click").then(() => refresh());
+  };
 
   return (
     <MotionConfig reducedMotion="user">
@@ -352,7 +396,21 @@ export function StartDay() {
                     onUndone={() => markUndone(b.mismatch!.pendingActionId)}
                   />
                 )}
+                {reached("picks") && (
+                  <PickedPlan
+                    picks={picks}
+                    pickId={day.pickId}
+                    plan={day.plan}
+                    revealed={revealedPicks}
+                    choosing={choosing}
+                    showPlan={reached("plan")}
+                    picksActive={current?.id === "picks"}
+                    planActive={current?.id === "plan"}
+                    onChoose={choose}
+                  />
+                )}
               </div>
+              <aside className="min-w-0 space-y-5">{reached("picks") && b && <TodoRail tickets={rail} />}</aside>
             </div>
           </div>
         )}
