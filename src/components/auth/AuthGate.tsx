@@ -14,7 +14,8 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const authenticated = useSyncExternalStore(subscribe, isSignedIn, () => false);
 
   useEffect(() => {
-    if (!authenticated) {
+    // Re-check storage: the hydration render always sees the server snapshot (false).
+    if (!authenticated && !isDemoAuthenticated()) {
       router.replace("/");
     }
   }, [authenticated, router]);
