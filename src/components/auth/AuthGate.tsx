@@ -3,12 +3,15 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { isDemoAuthenticated } from "@/lib/auth";
+import { hasDemoMarker } from "@/lib/demo-cookies";
 
 const subscribe = () => () => {};
+// Demo-mode browsers (Try the demo, ?demo=1) are let in with no login.
+const isSignedIn = () => isDemoAuthenticated() || hasDemoMarker();
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const authenticated = useSyncExternalStore(subscribe, isDemoAuthenticated, () => false);
+  const authenticated = useSyncExternalStore(subscribe, isSignedIn, () => false);
 
   useEffect(() => {
     if (!authenticated) {
