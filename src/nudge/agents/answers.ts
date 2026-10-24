@@ -9,7 +9,7 @@ import { beginStep, completeStep, type AgentName, type Tier } from "@/ai/agents/
 import { standupToText, type Briefing, type StandupDraft } from "@/nudge/briefing";
 import type { BriefingAnswers } from "@/nudge/scenes";
 import type { DataSource, Ticket } from "@/nudge/types";
-import { applyEditFallback, buildPlan, orderForPick, pendingLine, planSentence, standupLines, todayLines } from "./analysis";
+import { applyEditFallback, buildPlan, extraTodayLines, orderForPick, pendingLine, planSentence, standupLines, todayLines } from "./analysis";
 import { getSessionAction, updateActionPayload } from "./actions";
 import { modelJSON, modelText, VOICE_RULES } from "./model";
 import { safeZone, spokenTime } from "./time";
@@ -115,7 +115,7 @@ async function answerPick(ctx: Ctx, a: Extract<Answer, { kind: "pick" }>) {
   const pool = new Map<string, Ticket>([...b.picks.map((p) => [p.id, p.ticket] as const), ...b.todo.map((t) => [t.key, t] as const)]);
   const todo = [...pool.values()].filter((t) => t.key !== chosen.id);
   const declined = ctx.answers.catch?.decision === "decline";
-  const standup: StandupDraft = { ...b.standup, today: todayLines(plan, b.picks, b.mismatch, declined) };
+  const standup: StandupDraft = { ...b.standup, today: todayLines(plan, b.picks, b.mismatch, declined, extraTodayLines(b.standup.today, b.picks, b.mismatch)) };
   const fallback = () => planSentence(plan, chosen.id, ctx.tz, b.picks);
   const speech = await modelText(
     {
@@ -160,8 +160,8 @@ async function answerEdit(ctx: Ctx, instruction: string) {
   const standup = redraft.value;
   const beforeLines = standupLines(before);
   const afterLines = standupLines(standup);
-  const removed = beforeLines.filter((l) => !afterLines.includes(l));
-  const added = afterLines.filter((l) => !beforeLines.includes(l));
+  const removed = beforeLines.filter((l) => !afterLines.includes(l) && l !== "None");
+  const added = afterLines.filter((l) => !beforeLines.includes(l) && l !== "None");
   const quote = (l: string) => (l.length > 60 ? `${l.slice(0, 57)}…` : l);
   const speech = !removed.length && !added.length
     ? "I couldn't tell what to change there. Could you say it another way?"

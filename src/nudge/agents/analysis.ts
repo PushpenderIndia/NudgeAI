@@ -106,7 +106,7 @@ export function tagsFor(t: Ticket, ctx: RankContext): TaskPick["tags"] {
   if (t.due && t.due.slice(0, 10) <= today) tags.push("due_today");
   const email = linkedEmail(t, ctx.facts.inbox);
   if (/escalat/i.test(t.notes ?? "") || email?.urgent) tags.push("escalation");
-  if (/block|waiting/i.test(t.notes ?? "") || (/review/i.test(t.title) && blockedPerson(t))) tags.push("unblocks");
+  if (/\b(blocking|blocked|unblocks?|waiting)\b/i.test(t.notes ?? "") || (/review/i.test(t.title) && blockedPerson(t))) tags.push("unblocks");
   const fitting = ctx.gaps.find((g) => g.minutes >= t.estimateHours * 60);
   if (fitting && eventAfter(fitting, ctx.events)) tags.push("fits_window");
   return tags;
@@ -128,21 +128,21 @@ function score(t: Ticket, ctx: RankContext) {
 /** One line tied to the data: due date + escalation, who it unblocks, which window it fits. */
 export function reasonFor(t: Ticket, ctx: RankContext, tags = tagsFor(t, ctx)) {
   const { facts } = ctx;
-  if (tags.includes("due_today") || tags.includes("escalation")) {
+  const due = tags.includes("due_today") ? "Due today" : `${t.priority}`;
+  if (tags.includes("escalation")) {
     const email = linkedEmail(t, facts.inbox);
-    const due = tags.includes("due_today") ? "Due today" : `${t.priority}`;
-    if (email) return `${due}; ${firstName(email.from)} escalated it for a customer`;
-    return tags.includes("escalation") ? `${due} with a customer escalation` : `${due}, ${t.priority}`;
+    return email ? `${due}; ${senderName(email)} escalated it for a customer` : `${due} with a customer escalation`;
   }
   if (tags.includes("unblocks")) {
     const person = blockedPerson(t);
     const pr = prFor(t, facts.pullRequests);
-    const days = pr ? Math.max(1, Math.round(minutesBetween(pr.openedAt, facts.now) / 1440)) : 0;
+    const days = pr ? Math.max(1, Math.round(minutesBetween(startOfLocalDay(new Date(pr.openedAt), facts.tz), startOfLocalDay(facts.now, facts.tz)) / 1440)) : 0;
     const who = person ?? pr?.author ?? "a teammate";
     return days ? `Unblocks ${who}; review requested ${days} day${days === 1 ? "" : "s"} ago` : `Unblocks ${who}`;
   }
   const fitting = ctx.gaps.find((g) => g.minutes >= t.estimateHours * 60);
   const next = fitting ? eventAfter(fitting, ctx.events) : null;
+  if (tags.includes("due_today")) return `Due today, ${t.priority}`;
   if (fitting && next) return `${t.estimateHours} h; fits before your ${spokenTime(next.start, facts.tz)} ${shortEvent(next.title)}`;
   return `${t.priority}, about ${t.estimateHours} h`;
 }
@@ -235,7 +235,9 @@ export function standupFacts(f: Facts): StandupFacts {
     yesterdayCommits: [...branches].map(([branch, messages]) => ({ branch, count: messages.length, messages })),
     openedPrs: f.pullRequests.filter((p) => inYesterday(p.openedAt) && isUser(p.author, f.profile)),
     closedTickets: f.tickets.filter((t) => inYesterday(t.closedAt)),
-    meetings: f.meetings.filter((m) => new Date(m.heldAt).getTime() >= today - 3 * 86400000 && new Date(m.heldAt).getTime() < today),
+    meetings: f.meetings
+      .filter((m) => new Date(m.heldAt).getTime() >= today - 7 * 86400000 && new Date(m.heldAt).getTime() < today)
+      .sort((a, b) => b.heldAt.localeCompare(a.heldAt)),
     lastStandup: notes[0] ?? null,
   };
 }
@@ -251,23 +253,35 @@ export function buildStandup(
     yesterday.push(`Opened PR #${pr.number} "${pr.title}"${keys.length ? ` for ${keys.join(", ")}` : ""}`);
   }
   for (const t of sf.closedTickets) yesterday.push(`Closed ${t.key} ${t.title}`);
-  for (const m of sf.meetings) {
-    const open = m.actionItems.filter((a) => !a.done && isUser(a.owner, opts.profile));
-    if (open.length) yesterday.push(`${m.title}: own "${open[0].title}"`);
-  }
   if (!yesterday.length && sf.lastStandup) yesterday.push(sf.lastStandup.text);
-  return { yesterday, today: todayLines(opts.plan, opts.picks, opts.mismatch, opts.catchDeclined), blockers: [] };
+  // The latest meeting's open item for the user, e.g. "Follow-up from the incident review: ...".
+  const followUps: string[] = [];
+  for (const m of sf.meetings) {
+    const open = m.actionItems.find((a) => !a.done && isUser(a.owner, opts.profile));
+    if (open) {
+      followUps.push(`Follow-up from the ${m.title.split(":")[0].toLowerCase()}: ${open.title.charAt(0).toLowerCase()}${open.title.slice(1)}`);
+      break;
+    }
+  }
+  return { yesterday, today: todayLines(opts.plan, opts.picks, opts.mismatch, opts.catchDeclined, followUps), blockers: [] };
 }
 
-export function todayLines(plan: PlanBlock[], picks: TaskPick[], mismatch: Omit<Mismatch, "pendingActionId"> | null, catchDeclined?: boolean) {
+/** Today's lines: planned tasks in order, any extra lines kept, then the pending ticket move. */
+export function todayLines(plan: PlanBlock[], picks: TaskPick[], mismatch: Omit<Mismatch, "pendingActionId"> | null, catchDeclined?: boolean, extra: string[] = []) {
   const lines = plan
     .filter((b) => b.kind === "task" && b.ticketKey)
     .map((b, i) => {
       const t = picks.find((p) => p.id === b.ticketKey)?.ticket;
       return `${i === 0 ? "First: " : ""}${b.ticketKey} ${t?.title ?? b.title}`;
     });
+  lines.push(...extra);
   if (mismatch && catchDeclined) lines.push(pendingLine(mismatch));
   return lines;
+}
+
+/** Lines of a Today list that aren't planned tasks or the pending move (user edits, follow-ups). */
+export function extraTodayLines(today: string[], picks: TaskPick[], mismatch: Pick<Mismatch, "ticket" | "suggestedStatus"> | null) {
+  return today.filter((l) => !picks.some((p) => l.replace(/^First: /, "").startsWith(`${p.id} `)) && !(mismatch && l === pendingLine(mismatch)));
 }
 
 export const pendingLine = (m: Pick<Mismatch, "ticket" | "suggestedStatus">) => `Pending: move ${m.ticket.key} to ${m.suggestedStatus}`;
@@ -288,15 +302,20 @@ export function replyFallback(email: InboxEmail, ticket: Ticket | undefined, pro
   const what = ticket ? `I'm on it: ${ticket.key} (${ticket.title}) is my first task today.` : "I'm on it and will look into it this morning.";
   return {
     subject,
-    body: `Hi ${firstName(email.from)},\n\nThanks for flagging this. ${what}${when}\n\nBest,\n${firstName(profile.name)}`,
+    body: `Hi ${senderName(email)},\n\nThanks for flagging this. ${what}${when}\n\nBest,\n${firstName(profile.name)}`,
   };
+}
+
+/** "Thanks, Maya (Support)" → Maya; otherwise the sender's first name. */
+export function senderName(email: InboxEmail) {
+  return email.body.match(/(?:thanks|regards|best|cheers),?\s+([A-Z][a-z]+)/i)?.[1] ?? firstName(email.from);
 }
 
 /* --------------------------- Standup edits --------------------------- */
 
 const STOP = new Set("the a an that this my me i to about point line item bit part one from of on in for and with please".split(" "));
 const words = (s: string) =>
-  s.toLowerCase().replace(/[^a-z0-9#\-\s]/g, " ").split(/\s+/).filter((w) => w && !STOP.has(w)).map((w) => w.replace(/s$/, ""));
+  s.toLowerCase().replace(/[^a-z0-9#\-\s]/g, " ").split(/\s+/).filter((w) => !STOP.has(w)).map((w) => w.replace(/s$/, "")).filter((w) => w.length > 1);
 
 export function standupLines(s: StandupDraft) {
   return [

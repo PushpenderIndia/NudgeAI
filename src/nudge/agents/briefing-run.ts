@@ -2,14 +2,16 @@ import { and, desc, eq, gte, isNull } from "drizzle-orm";
 import { after } from "next/server";
 import { z } from "zod";
 import { db } from "@/db";
-import { agentRuns } from "@/db/schema";
+import { agentRuns, pendingActions } from "@/db/schema";
 import type { FoundItem } from "@/db/schema";
+import { queueAction } from "@/ai/approvals";
 import { createRun, describePayload, finishRun, stepper } from "@/ai/agents/runs";
 import type { Briefing, InboxDraft, Mismatch, Pick as TaskPick, StandupDraft } from "@/nudge/briefing";
 import { STANDUP_CHANNEL, standupToText } from "@/nudge/briefing";
 import type { RequestContext } from "@/nudge/session";
 import type { CalendarEvent, Commit, DataSource, InboxEmail, MeetingNote, MemoryNote, PullRequest, Ticket, UserProfile } from "@/nudge/types";
 import { getDataSource } from "@/nudge/datasource";
+import { DEMO_WORKDAY } from "@demo/seed";
 import {
   DEFAULT_WORKDAY,
   backlog,
@@ -29,7 +31,6 @@ import {
   type RankContext,
   type Workday,
 } from "./analysis";
-import { queueSessionAction } from "./actions";
 import { modelJSON, VOICE_RULES } from "./model";
 import { buildTemplateScript, generateSceneScript } from "./script";
 import { clockTime, safeZone, spokenTime, startOfLocalDay } from "./time";
@@ -43,10 +44,7 @@ const meetingItem = (m: MeetingNote): FoundItem => ({ kind: "meeting", label: m.
 const eventItem = (e: CalendarEvent, tz: string): FoundItem => ({ kind: "meeting", label: e.title, detail: `${clockTime(e.start, tz)}–${clockTime(e.end, tz)}` });
 
 /** Workday window: the demo seed may export DEMO_WORKDAY; otherwise 09:00–18:00. */
-export async function workdayFor(ds: DataSource): Promise<Workday> {
-  void ds;
-  return DEFAULT_WORKDAY;
-}
+export const workdayFor = (ds: DataSource): Workday => (ds.mode === "demo" ? DEMO_WORKDAY : DEFAULT_WORKDAY);
 
 const RankSchema = z.object({ picks: z.array(z.object({ key: z.string(), reason: z.string().min(3) })).min(1).max(3) });
 const StandupSchema = z.object({ yesterday: z.array(z.string()), today: z.array(z.string()), blockers: z.array(z.string()).default([]) });
@@ -62,7 +60,7 @@ export async function runBriefing(runId: string, ds: DataSource) {
   const step = stepper(runId);
   const now = new Date();
   const sessionKey = ds.sessionKey;
-  const workday = await workdayFor(ds);
+  const workday = workdayFor(ds);
 
   /* ---------------- Nudge: kick off ---------------- */
   const profile = await step<UserProfile>(
@@ -117,7 +115,7 @@ export async function runBriefing(runId: string, ds: DataSource) {
       const found = findMismatch({ tickets, pullRequests, profile });
       let mismatch: Mismatch | null = null;
       if (found) {
-        const action = await queueSessionAction({
+        const action = await queueAction({
           actionType: "transition_ticket",
           summary: `Move ${found.ticket.key} to ${found.suggestedStatus}`,
           payload: { key: found.ticket.key, from: found.ticket.status, to: found.suggestedStatus, pr: found.pr.number },
@@ -127,10 +125,10 @@ export async function runBriefing(runId: string, ds: DataSource) {
         });
         mismatch = { ...found, pendingActionId: action.id };
       }
-      const branchCommits = found ? history.commits.filter((c) => c.branch === found.pr.branch) : [];
+      const branchCommits = found ? history.commits.filter((c) => c.branch === found.pr.branch || found.pr.branch.startsWith(`${c.branch}-`)) : [];
       const open = pullRequests.filter((p) => p.state === "open");
       const narration = found
-        ? `${branchCommits.length ? `${plural(branchCommits.length, "commit")} on ${found.pr.branch}, ` : ""}PR #${found.pr.number} open, but ${found.ticket.key} still says ${found.ticket.status}.`
+        ? `${branchCommits.length ? `${plural(branchCommits.length, "commit")} on ${branchCommits[0].branch}, ` : ""}PR #${found.pr.number} open, but ${found.ticket.key} still says ${found.ticket.status}.`
         : `${plural(open.length, "open PR")} and ${plural(tickets.filter((t) => t.status !== "Done").length, "open ticket")}; statuses all match.`;
       return {
         narration,
@@ -218,7 +216,7 @@ export async function runBriefing(runId: string, ds: DataSource) {
         () => base
       );
       const standup = drafted.value.today.length || !base.today.length ? drafted.value : base;
-      const action = await queueSessionAction({
+      const action = await queueAction({
         actionType: "post_slack",
         summary: `Post standup to ${STANDUP_CHANNEL}`,
         payload: { channel: STANDUP_CHANNEL, text: standupToText(standup) },
@@ -282,7 +280,7 @@ export async function runBriefing(runId: string, ds: DataSource) {
         },
         fallback
       );
-      const action = await queueSessionAction({
+      const action = await queueAction({
         actionType: "send_email",
         summary: `Reply to ${urgent.from}: ${reply.value.subject}`,
         payload: { to: urgent.fromEmail, subject: reply.value.subject, body: reply.value.body, inReplyTo: urgent.id },
@@ -366,6 +364,10 @@ export async function startBriefing(ctx: RequestContext, opts: { force?: boolean
     if (stale) await finishRun(existing.id, "failed");
     else if (existing.status === "running" || (!opts.force && existing.status === "done" && existing.briefing)) return { runId: existing.id, started: false };
   }
+  // "Plan my day again" supersedes the old run's approvals that are still waiting.
+  if (existing)
+    await db.update(pendingActions).set({ status: "rejected" })
+      .where(and(eq(pendingActions.runId, existing.id), eq(pendingActions.sessionKey, ctx.sessionKey), eq(pendingActions.status, "pending")));
   const runId = await createRun("plan_day", "Plan my day", ctx.sessionKey);
   const work = runBriefing(runId, ds).catch(async (error) => {
     console.error("briefing failed", error);
