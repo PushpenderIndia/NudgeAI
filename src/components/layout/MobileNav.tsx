@@ -30,7 +30,7 @@ export function MobileNav() {
       {open && (
         <nav className="grid grid-cols-2 gap-1 border-b border-border bg-surface px-3 py-3">
           {NAV_ITEMS.map((item) => {
-            const active = pathname.startsWith(item.href);
+            const active = pathname === item.href || pathname.startsWith(item.href + "/");
             const Icon = item.icon;
             return (
               <Link

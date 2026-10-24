@@ -5,7 +5,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
 import { NAV_ITEMS } from "@/lib/nav";
 import { NudgeLogo } from "@/components/NudgeLogo";
-import { ConnectionDots } from "@/components/layout/ConnectionDots";
 import { Bell } from "@/components/notifications/Bell";
 import { DemoPill } from "@/components/demo/DemoPill";
 import { cn } from "@/lib/utils";
@@ -52,10 +51,6 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="mt-4 rounded-lg border border-border bg-surface/40 p-3">
-        <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-wider text-muted">Connections</p>
-        <ConnectionDots />
-      </div>
       <button
         type="button"
         onClick={handleSignOut}
