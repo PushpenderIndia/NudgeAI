@@ -14,7 +14,10 @@ import { OwlAvatar, owlStateFor } from "@/components/briefing/OwlAvatar";
 import { StatusLine } from "@/components/briefing/StatusLine";
 import { useSceneEngine, type InteractionContext, type InteractionResult } from "@/components/briefing/engine/useSceneEngine";
 import type { Via } from "@/components/briefing/engine/intents";
-import { answer, fetchView, listApprovals, startBriefing, type BriefingView, type PendingApproval } from "./api";
+import { AgentGraphPanel } from "@/components/graph/AgentGraphPanel";
+import { answer, fetchView, listApprovals, startBriefing, startPrep, type BriefingView, type PendingApproval } from "./api";
+import { HowIPlanned } from "./HowIPlanned";
+import { Meetings } from "./Meetings";
 import { NeedsYourOk } from "./NeedsYourOk";
 import { CatchCard } from "./CatchCard";
 import { initialOverrides, resolve, type FlowOverrides } from "./flow";
@@ -64,6 +67,8 @@ export function StartDay() {
   const [overrides, setOverrides] = useState<FlowOverrides | null>(null);
   const [undone, setUndone] = useState<string[]>([]);
   const [approvals, setApprovals] = useState<PendingApproval[]>([]);
+  const [panelRun, setPanelRun] = useState<string | null>(null);
+  const [prepRuns, setPrepRuns] = useState<Record<string, string>>({});
   const modeRef = useRef<Mode>("loading");
   const viewRef = useRef<BriefingView | null>(null);
   const runRef = useRef<string | null>(null);
@@ -401,6 +406,7 @@ export function StartDay() {
 
   const briefing = mode === "briefing" && sceneRank >= rank("catch");
   const settled = mode === "settled";
+  const wrapping = current?.id === "wrapup";
   const reached = (id: string) => settled || sceneRank >= rank(id);
 
   const picks = b?.picks ?? [];
@@ -427,6 +433,13 @@ export function StartDay() {
   const runActionIds = new Set([b?.mismatch?.pendingActionId, b?.standupActionId, b?.inbox?.pendingActionId].filter(Boolean));
   const traceFor = (actionId: string) => (runId && runActionIds.has(actionId) ? runId : null);
 
+  const prep = async (eventId: string) => {
+    const started = await startPrep(eventId);
+    if (!started) return;
+    setPrepRuns((r) => ({ ...r, [eventId]: started.runId }));
+    setPanelRun(started.runId);
+  };
+
   const saveEditor = async (s: StandupDraft) => {
     if (!runId) return;
     const res = await answer.replace(runId, s);
@@ -451,10 +464,10 @@ export function StartDay() {
         {stage}
         {mode !== "loading" && !stage && (
           <div className="space-y-6 pb-28">
-            <header className={briefing ? "sticky top-0 z-20 -mx-4 bg-bg/95 px-4 pb-4 pt-2 backdrop-blur md:-mx-8 md:px-8" : undefined}>
+            <header className={briefing && !wrapping ? "sticky top-0 z-20 -mx-4 bg-bg/95 px-4 pb-4 pt-2 backdrop-blur md:-mx-8 md:px-8" : undefined}>
               <div className="flex items-start gap-4">
                 <motion.div layoutId="nudge-owl" transition={REVEAL} className="inline-flex shrink-0">
-                  <OwlAvatar state={briefing ? owl : "idle"} size={briefing ? 48 : 44} urgent={current?.id === "inbox"} />
+                  <OwlAvatar state={briefing ? owl : "idle"} size={briefing && !wrapping ? 48 : 40} urgent={current?.id === "inbox"} />
                 </motion.div>
                 <div className="min-w-0 flex-1 space-y-1.5">
                   {briefing ? (
@@ -477,6 +490,11 @@ export function StartDay() {
                 <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={REVEAL} className="mt-4 md:pl-16">
                   <InteractionPanel engine={engine} hints={hints} />
                 </motion.div>
+              )}
+              {(settled || wrapping) && view?.run && (
+                <div className="mt-5">
+                  <HowIPlanned run={view.run} active={wrapping} onViewTrace={() => setPanelRun(view.run.id)} />
+                </div>
               )}
             </header>
 
@@ -529,12 +547,21 @@ export function StartDay() {
                     onChanged={refreshApprovals}
                   />
                 )}
+                {reached("wrapup") && b && <Meetings events={b.events} prepRuns={prepRuns} onPrep={(eventId) => void prep(eventId)} onOpenRun={setPanelRun} />}
               </div>
               <aside className="min-w-0 space-y-5">{reached("picks") && b && <TodoRail tickets={rail} />}</aside>
             </div>
           </div>
         )}
         {mode === "briefing" && <ControlBar engine={engine} />}
+        {panelRun && (
+          <AgentGraphPanel
+            runId={panelRun}
+            run={panelRun === view?.run.id ? view.run : null}
+            open
+            onOpenChange={(open) => !open && setPanelRun(null)}
+          />
+        )}
       </LayoutGroup>
     </MotionConfig>
   );
