@@ -21,8 +21,8 @@ export type AgentName = keyof typeof AGENT_ROSTER;
 // Keeps each step on screen long enough to follow, even when the work is instant.
 const MIN_STEP_MS = 1200;
 
-export async function createRun(type: AgentRunType, title: string) {
-  const [run] = await db.insert(agentRuns).values({ trigger: type, title, status: "running" }).returning({ id: agentRuns.id });
+export async function createRun(type: AgentRunType, title: string, sessionKey?: string) {
+  const [run] = await db.insert(agentRuns).values({ trigger: type, title, status: "running", ...(sessionKey ? { sessionKey } : {}) }).returning({ id: agentRuns.id });
   return run.id;
 }
 

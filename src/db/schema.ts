@@ -220,7 +220,7 @@ export const reminders = sqliteTable("reminders", {
 /* ------------------------------------------------------------------ */
 export type AgentRunStatus = "running" | "waiting_for_user" | "done" | "failed";
 export type AgentStepStatus = "running" | "done" | "failed";
-export type AgentRunType = "plan_day" | "urgent_email" | "meeting_ended";
+export type AgentRunType = "plan_day" | "urgent_email" | "meeting_ended" | "meeting_prep" | "weekly_update";
 export type FoundItemKind = "meeting" | "action_item" | "decision" | "email" | "jira" | "commit" | "pr" | "task" | "draft" | "memory";
 /** Something an agent found or produced during a step, shown as a small row. */
 export type FoundItem = { kind: FoundItemKind; label: string; detail?: string; href?: string; urgent?: boolean };
