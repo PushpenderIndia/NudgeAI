@@ -124,6 +124,26 @@ body {
   animation: agent-pulse 1.6s ease-in-out infinite;
 }
 
+/* Owl beak while Nudge speaks: a small, calm open/close. */
+@keyframes owl-speak {
+  0%, 100% { transform: scaleY(1); }
+  50% { transform: scaleY(0.7); }
+}
+.owl-speak {
+  transform-box: fill-box;
+  transform-origin: top center;
+  animation: owl-speak 0.45s ease-in-out infinite;
+}
+
+/* Thin ring around the owl while the mic is open. */
+@keyframes owl-listen {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.85; }
+}
+.owl-listen-ring {
+  animation: owl-listen 2s ease-in-out infinite;
+}
+
 @keyframes fade-in {
   from { opacity: 0; }
   to { opacity: 1; }

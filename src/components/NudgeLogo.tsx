@@ -22,6 +22,8 @@ export function OwlMark({
   size = 40,
   urgent = false,
   blinking = false,
+  speaking = false,
+  gaze,
   className,
 }: {
   size?: number;
@@ -30,11 +32,16 @@ export function OwlMark({
   /** Slow blink while an agent is working. */
   blinking?: boolean;
   animated?: boolean;
+  /** Small beak open/close while Nudge is talking. */
+  speaking?: boolean;
+  /** Fixed pupil offset (each axis -1.5…1.5), e.g. looking up while thinking. Overrides the pointer. */
+  gaze?: { x: number; y: number };
   className?: string;
 }) {
   const [pointer, setPointer] = useState({ x: 0, y: 0 });
   const uid = urgent ? "u" : "n";
-  const pupilTransform = `translate(${pointer.x} ${pointer.y})`;
+  const look = gaze ?? pointer;
+  const pupilTransform = `translate(${look.x} ${look.y})`;
   return (
     <svg
       width={size}
@@ -102,7 +109,7 @@ export function OwlMark({
       </g>
 
       {/* beak */}
-      <path d="M32 33 L35.4 38 L28.6 38 Z" fill="#FBBF24" opacity="0.9" />
+      <path d="M32 33 L35.4 38 L28.6 38 Z" fill="#FBBF24" opacity="0.9" className={cn(speaking && "owl-speak")} />
     </svg>
   );
 }
