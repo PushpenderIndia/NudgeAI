@@ -46,7 +46,11 @@ export async function listPending(): Promise<PendingAction[]> {
 }
 
 /** Executes an approved action for real (via the connector or locally) and logs it. */
-export async function approveAction(id: string): Promise<{ ok: boolean; message: string }> {
+export type ApproveOptions = { via?: "voice" | "click" };
+export type ApproveResult = { ok: boolean; message: string; undoUntil?: string };
+
+export async function approveAction(id: string, opts: ApproveOptions = {}): Promise<ApproveResult> {
+  void opts;
   const action = await db.select().from(pendingActions).where(eq(pendingActions.id, id)).get();
   if (!action) return { ok: false, message: "That action no longer exists." };
   if (action.status !== "pending") return { ok: false, message: "That action was already handled." };
@@ -107,4 +111,10 @@ export async function rejectAction(id: string): Promise<{ ok: boolean; message: 
   }
   await logActivity({ action: "Rejected", summary: `Dismissed: ${action.summary}`, entityType: "pending_action", entityId: id });
   return { ok: true, message: "Dismissed." };
+}
+
+/** Reverts an approval still inside its Undo window. */
+export async function undoAction(id: string): Promise<{ ok: boolean; message: string }> {
+  void id;
+  return { ok: false, message: "Undo is not available yet." };
 }
