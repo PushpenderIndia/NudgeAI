@@ -15,7 +15,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Re-check storage: the hydration render always sees the server snapshot (false).
-    if (!authenticated && !isDemoAuthenticated()) {
+    if (!authenticated && !isSignedIn()) {
       router.replace("/");
     }
   }, [authenticated, router]);
