@@ -20,6 +20,7 @@ export const AnswerSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("pick"), choiceId: z.string().min(1), via: Via }),
   z.object({ kind: z.literal("edit"), instruction: z.string().min(1).max(400) }),
   z.object({ kind: z.literal("done") }),
+  z.object({ kind: z.literal("replace"), standup: z.object({ yesterday: z.array(z.string()), today: z.array(z.string()), blockers: z.array(z.string()) }) }),
   z.object({ kind: z.literal("post"), decision: z.enum(["confirm", "decline"]), via: Via }),
 ]);
 export type Answer = z.infer<typeof AnswerSchema>;
@@ -80,6 +81,8 @@ export async function handleAnswer(run: AgentRun, answer: Answer, ds: DataSource
       return { status: 200, body: await answerEdit(ctx, answer.instruction) };
     case "done":
       return { status: 200, body: await answerDone(ctx) };
+    case "replace":
+      return { status: 200, body: await answerReplace(ctx, answer.standup) };
     case "post":
       return { status: 200, body: await answerPost(ctx, answer) };
   }
@@ -183,6 +186,18 @@ async function answerDone(ctx: Ctx) {
   await save(ctx, { answers: { ...ctx.answers, standupFinal: standupLines(ctx.briefing.standup) } });
   await syncPost(ctx);
   return { standup: ctx.briefing.standup };
+}
+
+/** The text editor's version of the standup (offered after three spoken edits): saved as-is, no model call. */
+async function answerReplace(ctx: Ctx, standup: StandupDraft) {
+  const before = standupLines(ctx.briefing.standup);
+  const after = standupLines(standup);
+  await save(ctx, {
+    briefing: { ...ctx.briefing, standup },
+    answers: { ...ctx.answers, standupEdits: [...(ctx.answers.standupEdits ?? []), { instruction: "Edited in the text editor", before, after }], standupFinal: after },
+  });
+  await syncPost(ctx);
+  return { before, after, standup };
 }
 
 async function answerPost(ctx: Ctx, a: Extract<Answer, { kind: "post" }>) {

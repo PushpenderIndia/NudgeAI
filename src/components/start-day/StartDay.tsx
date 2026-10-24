@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { LayoutGroup, MotionConfig, motion } from "framer-motion";
-import { isFinished } from "@/lib/agent-runs";
+import { isFinished, type RunView } from "@/lib/agent-runs";
+import type { StandupDraft } from "@/nudge/briefing";
 import { SCENE_IDS, type Intent, type Scene, type SceneScript } from "@/nudge/scenes";
 import { lastBriefed, markBriefed, shouldAutoBrief, useVoicePrefs } from "@/nudge/voice/prefs";
 import { Caption } from "@/components/briefing/Caption";
@@ -17,6 +18,8 @@ import { CatchCard } from "./CatchCard";
 import { initialOverrides, resolve, type FlowOverrides } from "./flow";
 import { TeamStage, WelcomeStage, firstName, greeting, runStatus, type Line } from "./Stage";
 import { PickedPlan } from "./PickedPlan";
+import { StandupCard } from "./StandupCard";
+import { diffLines, editSummary, linesToStandup } from "./standup";
 import { TodoRail } from "./TodoRail";
 import { REVEAL, hhmm, refreshSandbox } from "./ui";
 
@@ -26,6 +29,10 @@ type Mode = "loading" | "intro" | "pending" | "briefing" | "settled";
 const TEAM_MIN_MS = 8000;
 const TEAM_MAX_MS = 25000;
 const FALLBACK_AFTER_MS = 8000;
+const DIFF_MS = 1500;
+
+/** When Reporter posted the standup, from the step the answer added to the run. */
+const postedAt = (run?: RunView | null) => run?.steps.find((s) => s.phase === "Posting your standup")?.startedAt ?? null;
 
 const rank = (id?: string | null) => (id ? SCENE_IDS.indexOf(id as (typeof SCENE_IDS)[number]) : -1);
 
@@ -68,6 +75,17 @@ export function StartDay() {
 
   const patchFlow = useCallback((p: FlowOverrides) => setOverrides((o) => ({ ...(o ?? {}), ...p })), []);
   const markUndone = useCallback((actionId: string) => setUndone((u) => [...u, actionId]), []);
+
+  // Redraft diff: struck-through and highlighted lines for ~1.5 s, then the clean version.
+  const diffTimer = useRef<number | undefined>(undefined);
+  const showDiff = useCallback(
+    (before: string[], after: string[]) => {
+      window.clearTimeout(diffTimer.current);
+      patchFlow({ diff: diffLines(before, after), standup: linesToStandup(after) });
+      diffTimer.current = window.setTimeout(() => patchFlow({ diff: null }), DIFF_MS);
+    },
+    [patchFlow]
+  );
 
   /* --------------------------- run + polling --------------------------- */
 
@@ -206,6 +224,28 @@ export function StartDay() {
       }
       patchFlow({ pickId: choiceId, plan: res.plan, todo: res.todo, standup: res.standup });
       return lineFor(res.speech);
+    }
+
+    if (scene.id === "standup") {
+      if (intent.intent === "edit") {
+        if (ctx.replay) {
+          const saved = v?.answers.standupEdits?.[ctx.editCount];
+          if (!saved) return { next: "stay" };
+          showDiff(saved.before, saved.after);
+          return { speech: editSummary(saved.before, saved.after), next: "stay" };
+        }
+        engineRef.current?.setStatusLine("Reporter", "Reporter is redrafting your standup…");
+        const res = await answer.edit(id, intent.editInstruction ?? "");
+        if (!res) return { speech: "I couldn't redraft that just now. Anything else?", next: "stay" };
+        showDiff(res.before, res.after);
+        return { speech: res.speech ?? editSummary(res.before, res.after), next: "stay" };
+      }
+      if (ctx.optionId === "editor") {
+        patchFlow({ editor: true });
+        return { next: "stay" };
+      }
+      if (!ctx.replay) await answer.done(id);
+      return {};
     }
     return {};
   };
@@ -350,6 +390,24 @@ export function StartDay() {
     void answer.pick(runId, choiceId, "click").then(() => refresh());
   };
 
+  const saveEditor = async (s: StandupDraft) => {
+    if (!runId) return;
+    const res = await answer.replace(runId, s);
+    patchFlow({ editor: false });
+    if (res) showDiff(res.before, res.after);
+    else patchFlow({ standup: s });
+    engine.respond({ kind: "click", optionId: "done" });
+  };
+
+  const standupWords = [...day.standup.yesterday, ...day.standup.today].join(" ").toLowerCase();
+  const removable = ["incident", "meeting", "review", "sync"].find((w) => standupWords.includes(w));
+  const hints =
+    engine.interaction?.type === "choice"
+      ? ["the first one", ...(picks[1] ? [`the ${picks[1].ticket.title.split(/\s+/).slice(0, 3).join(" ").toLowerCase()} one`] : [])]
+      : engine.interaction?.type === "edit"
+        ? [removable ? `remove the ${removable} point` : "add that I'm waiting on staging access", "looks good"]
+        : undefined;
+
   return (
     <MotionConfig reducedMotion="user">
       <LayoutGroup>
@@ -380,7 +438,7 @@ export function StartDay() {
               </div>
               {briefing && engine.interaction && (
                 <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={REVEAL} className="mt-4 md:pl-16">
-                  <InteractionPanel engine={engine} />
+                  <InteractionPanel engine={engine} hints={hints} />
                 </motion.div>
               )}
             </header>
@@ -407,6 +465,22 @@ export function StartDay() {
                     picksActive={current?.id === "picks"}
                     planActive={current?.id === "plan"}
                     onChoose={choose}
+                  />
+                )}
+                {reached("standup") && b && (
+                  <StandupCard
+                    standup={day.standup}
+                    diff={day.diff}
+                    build={current?.id === "standup"}
+                    editor={day.editor && current?.id === "standup"}
+                    onEditorSave={(s) => void saveEditor(s)}
+                    onEditorCancel={() => patchFlow({ editor: false })}
+                    active={current?.id === "standup" || current?.id === "post"}
+                    post={day.post}
+                    postUndone={Boolean(b.standupActionId && undone.includes(b.standupActionId))}
+                    postedAt={day.post?.at ?? postedAt(view?.run)}
+                    actionId={b.standupActionId}
+                    onPostUndone={() => b.standupActionId && markUndone(b.standupActionId)}
                   />
                 )}
               </div>
