@@ -358,7 +358,16 @@ export function useSceneEngine(options: SceneEngineOptions) {
       currentScene.current = scene;
       skipScene.current = skipAll.current;
       inputs.current = [];
-      patch({ current: scene, index: i, statusLine: null, interaction: null });
+      patch({
+        current: scene,
+        index: i,
+        statusLine: null,
+        interaction: null,
+        attempts: 0,
+        clickOnly: false,
+        editCount: 0,
+        editLimitReached: false,
+      });
       opts.current.handlers.onSceneStart?.(scene, i);
       await speakLine(g, scene.speech, scene.captionHighlights ?? [], true);
       if (!alive(g)) return;
