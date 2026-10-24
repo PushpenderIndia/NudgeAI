@@ -1,9 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Square, Volume2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Play, Square, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { ResetDemoButton } from "@/components/demo/ResetDemoButton";
+import type { ConnectionKey, ConnectionStatus } from "@/lib/connections";
+import { exitDemo, startDemo } from "@/lib/demo-client";
 import { cn } from "@/lib/utils";
 import { WebSpeechProvider, listVoices, speechSupported, type VoiceOption } from "@/nudge/voice";
 import { VOICE_RATES, useVoicePrefs, type BriefingMode, type VoiceRate } from "@/nudge/voice/prefs";
@@ -169,11 +173,81 @@ function BriefingSettings() {
   );
 }
 
-export function SettingsPanel() {
+const CONNECTIONS: { key: ConnectionKey; label: string; env: string }[] = [
+  { key: "github", label: "GitHub", env: "GITHUB_TOKEN" },
+  { key: "jira", label: "Jira", env: "JIRA_BASE_URL, JIRA_EMAIL and JIRA_API_TOKEN" },
+  { key: "calendar", label: "Google Calendar", env: "GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET" },
+  { key: "slack", label: "Slack webhook", env: "SLACK_WEBHOOK_URL" },
+];
+
+function ConnectionsSettings({ demo, connections }: { demo: boolean; connections: ConnectionStatus }) {
+  const router = useRouter();
+  async function exit() {
+    await exitDemo();
+    router.replace("/");
+  }
+  return (
+    <Section
+      title="Connections"
+      description={demo ? "This session runs on the demo story; nothing touches real services." : "Live integrations are configured on the server through environment variables."}
+    >
+      {demo ? (
+        <Field label="Using demo data" hint="GitHub, Jira, calendar, inbox and Slack come from the sample developer, Aarav.">
+          <Button variant="outline" size="sm" onClick={exit}>
+            Exit demo
+          </Button>
+        </Field>
+      ) : (
+        CONNECTIONS.map((c) => {
+          const on = connections[c.key];
+          return (
+            <Field key={c.key} label={c.label} hint={on ? "Configured on the server." : `Set ${c.env} to connect.`}>
+              <span className={cn("inline-flex items-center gap-1.5 text-xs", on ? "text-fg" : "text-muted")}>
+                <span className={cn("h-2 w-2 rounded-full", on ? "bg-success" : "bg-muted/40")} />
+                {on ? "Connected" : "Not connected"}
+              </span>
+            </Field>
+          );
+        })
+      )}
+    </Section>
+  );
+}
+
+function DemoSettings({ demo }: { demo: boolean }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  async function start() {
+    setBusy(true);
+    const key = await startDemo();
+    setBusy(false);
+    if (key) router.refresh();
+  }
+  return (
+    <Section title="Demo">
+      {demo ? (
+        <Field label="Reset demo" hint="Restore the starting story: tickets, inbox, Slack and approvals.">
+          <ResetDemoButton />
+        </Field>
+      ) : (
+        <Field label="Try the demo" hint="Run Start my day on a sample developer's morning. No logins needed.">
+          <Button variant="outline" size="sm" onClick={start} disabled={busy}>
+            <Play className="h-3.5 w-3.5" />
+            {busy ? "Starting…" : "Try the demo"}
+          </Button>
+        </Field>
+      )}
+    </Section>
+  );
+}
+
+export function SettingsPanel({ demo, connections }: { demo: boolean; connections: ConnectionStatus }) {
   return (
     <div className="max-w-3xl space-y-8">
       <VoiceSettings />
       <BriefingSettings />
+      <ConnectionsSettings demo={demo} connections={connections} />
+      <DemoSettings demo={demo} />
     </div>
   );
 }
