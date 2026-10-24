@@ -55,6 +55,12 @@ export async function queueAction(input: {
   return row;
 }
 
+/** True when the action exists and was queued for this session (demo key or "live"). */
+export async function ownsAction(id: string, sessionKey: string) {
+  const row = await db.select({ sessionKey: pendingActions.sessionKey }).from(pendingActions).where(eq(pendingActions.id, id)).get();
+  return row?.sessionKey === sessionKey;
+}
+
 export async function listPending(sessionKey?: string): Promise<PendingAction[]> {
   const status = eq(pendingActions.status, "pending");
   return db
