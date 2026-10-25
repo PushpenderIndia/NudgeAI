@@ -59,7 +59,7 @@ const SCENE_STATUS: Partial<Record<string, string>> = {
  * leaves behind. Starts (or reuses) today's plan_day run, follows it every 500 ms, and
  * decides from the voice prefs and saved answers whether to brief or show the day.
  */
-export function StartDay() {
+export function StartDay({ userName }: { userName?: string | null }) {
   const { prefs } = useVoicePrefs();
   const [runId, setRunId] = useState<string | null>(null);
   const [view, setView] = useState<BriefingView | null>(null);
@@ -418,7 +418,7 @@ export function StartDay() {
   const current = mode === "briefing" ? engine.current : null;
   const sceneRank = rank(current?.id);
   const owl = owlStateFor(engine.status);
-  const name = firstName(b?.userName);
+  const name = firstName(b?.userName ?? userName);
   const welcomeScene = script?.scenes.find((s) => s.id === "welcome");
   const audioHint = engine.audioBlocked ? (
     <button type="button" onClick={engine.unlockAudio} className="mt-3 cursor-pointer text-xs text-primary-soft underline-offset-2 hover:underline">
