@@ -196,7 +196,7 @@ export function planSentence(plan: PlanBlock[], choiceId: string, tz: string, pi
   if (nextEvent) {
     const after = plan.find((b) => b.kind === "event" && b.start > nextEvent.end);
     parts.push(
-      `You've got until ${spokenTime(first.end, tz)}, then ${shortEvent(nextEvent.title)}${after ? `, then a clear stretch till ${spokenTime(after.start, tz)}` : ""}.`
+      `You've got until ${spokenTime(nextEvent.start, tz)}, then ${shortEvent(nextEvent.title)}${after ? `, then a clear stretch till ${spokenTime(after.start, tz)}` : ""}.`
     );
     const second = tasks.find((b) => b.start >= nextEvent.end);
     const pick = picks.find((p) => p.id === second?.ticketKey);
