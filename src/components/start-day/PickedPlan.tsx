@@ -23,11 +23,11 @@ function PickCard({
   const urgent = isUrgent(pick.ticket) || pick.tags.includes("escalation");
   const body = (
     <>
-      <div className="flex items-center gap-2 text-xs text-muted">
+      <div className="flex items-center gap-2 whitespace-nowrap text-xs text-muted">
         {urgent && <Dot tone="urgent" />}
         <span className="font-medium text-fg/80">{pick.id}</span>
-        <span>· {pick.ticket.priority}</span>
-        <span>· {pick.ticket.estimateHours}h</span>
+        <span>{pick.ticket.priority}</span>
+        <span>{pick.ticket.estimateHours}h</span>
         {pinned && (
           <span className="ml-auto inline-flex items-center gap-1 text-primary-soft">
             <Pin className="h-3 w-3" />

@@ -68,6 +68,7 @@ export function StartDay() {
   const [holding, setHolding] = useState(false);
   const [startError, setStartError] = useState(false);
 
+  const [answered, setAnswered] = useState<string | null>(null);
   const [overrides, setOverrides] = useState<FlowOverrides | null>(null);
   const [undone, setUndone] = useState<string[]>([]);
   const [approvals, setApprovals] = useState<PendingApproval[]>([]);
@@ -201,6 +202,10 @@ export function StartDay() {
 
   const script = frozen ?? view?.sceneScript ?? null;
   const teamIndex = Math.max(0, script?.scenes.findIndex((s) => s.id === "team") ?? 0);
+  const frozenRef = useRef<SceneScript | null>(null);
+  useEffect(() => {
+    frozenRef.current = frozen;
+  }, [frozen]);
   const engineRef = useRef<ReturnType<typeof useSceneEngine> | null>(null);
 
   const onInteraction = async (scene: Scene, intent: Intent, via: Via, ctx: InteractionContext): Promise<InteractionResult> => {
@@ -208,6 +213,8 @@ export function StartDay() {
     const v = viewRef.current;
     const b = v?.briefing ?? null;
     if (!id) return {};
+    // A confirm or choice is settled once answered: hide its buttons during the follow-up line.
+    if (scene.interaction?.type !== "edit") setAnswered(scene.id);
 
     if (scene.id === "catch") {
       const decision = intent.intent === "confirm" ? "confirm" : "decline";
@@ -235,6 +242,13 @@ export function StartDay() {
     if (scene.id === "picks") {
       const choiceId = intent.choiceId ?? b?.picks[0]?.id;
       if (!choiceId) return {};
+      // The wrap-up line was written for the default pick; point it at the one chosen.
+      const wrap = frozenRef.current?.scenes.find((s) => s.id === "wrapup");
+      const first = b?.picks[0]?.id;
+      if (wrap && first && first !== choiceId && wrap.speech.includes(first)) {
+        wrap.speech = wrap.speech.split(first).join(choiceId);
+        wrap.captionHighlights = wrap.captionHighlights.map((h) => (h === first ? choiceId : h));
+      }
       const terms = [...(b?.picks.map((p) => p.id) ?? []), ...(b?.events.map((e) => hhmm(e.start)) ?? [])];
       const lineFor = (speech?: string) => (speech ? { replaceNext: { speech, captionHighlights: terms.filter((t) => speech.includes(t)) } } : {});
       if (ctx.replay) {
@@ -351,6 +365,7 @@ export function StartDay() {
     markBriefed();
     startedAt.current = Date.now();
     replayRef.current = false;
+    setAnswered(null);
     setOverrides(initialOverrides(viewRef.current?.answers, false));
     const ready = viewRef.current?.sceneScript;
     if (ready) {
@@ -369,6 +384,7 @@ export function StartDay() {
     if (!v?.sceneScript) return;
     replayRef.current = true;
     setPanelRun(null);
+    setAnswered(null);
     setOverrides(initialOverrides(v.answers, true));
     setFrozen(v.sceneScript);
     setMode("briefing");
@@ -381,6 +397,7 @@ export function StartDay() {
     replayRef.current = false;
     queuedStart.current = false;
     setPanelRun(null);
+    setAnswered(null);
     setOverrides(initialOverrides(undefined, false));
     setFrozen(null);
     setMode("pending");
@@ -524,7 +541,7 @@ export function StartDay() {
                   {startError && <p className="text-xs text-muted">I couldn&apos;t start planning your day. Try again in a moment.</p>}
                 </div>
               </div>
-              {briefing && engine.interaction && (
+              {briefing && engine.interaction && answered !== current?.id && (
                 <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={REVEAL} className="mt-4 md:pl-16">
                   <InteractionPanel engine={engine} hints={hints} />
                 </motion.div>
